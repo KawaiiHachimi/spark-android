@@ -1,0 +1,40 @@
+From fe616e739431169443a4f155eacf78239424fa51 Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:01:47 +0800
+Subject: [PATCH 1/4] selinux: honor the mainline live image permissive boot
+ option
+
+
+diff --git a/security/selinux/selinuxfs.c b/security/selinux/selinuxfs.c
+index 5aaaf69410bb09e8e19184c195f1eb0d9b8bfc8c..af50d76a095409a6eac6203101464d605854cde3 100644
+--- a/security/selinux/selinuxfs.c
++++ b/security/selinux/selinuxfs.c
+@@ -129,6 +129,19 @@ static ssize_t sel_read_enforce(struct file *filp, char __user *buf,
+ }
+ 
+ #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
++bool force_permissive = false;
++
++static int __init androidboot_selinux_setup(char *line)
++{
++	if (!strcmp(line, "permissive")) {
++		pr_warn("SELinux: Force permissive as requested\n");
++		force_permissive = true;
++	}
++        return 1;
++}
++
++__setup("androidboot.selinux=", androidboot_selinux_setup);
++
+ static ssize_t sel_write_enforce(struct file *file, const char __user *buf,
+ 				 size_t count, loff_t *ppos)
+ 
+@@ -154,6 +167,8 @@ static ssize_t sel_write_enforce(struct file *file, const char __user *buf,
+ 		goto out;
+ 
+ 	new_value = !!scan_value;
++	if (force_permissive)
++		new_value = 0;
+ 
+ 	old_value = enforcing_enabled();
+ 	if (new_value != old_value) {

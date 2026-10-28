@@ -1,0 +1,21 @@
+From 692a4092bdde11237886d6dda6c66ccbd80a38ba Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:01:47 +0800
+Subject: [PATCH 2/4] drm/virtio: restore default context creation for generic
+ guests
+
+
+diff --git a/drivers/gpu/drm/virtio/virtgpu_gem.c b/drivers/gpu/drm/virtio/virtgpu_gem.c
+index 435d37d36034023a2087b0a67c1708afc0431eef..df75aceb9704d9dd113f0f83defa3c95c063f10c 100644
+--- a/drivers/gpu/drm/virtio/virtgpu_gem.c
++++ b/drivers/gpu/drm/virtio/virtgpu_gem.c
+@@ -112,8 +112,7 @@ int virtio_gpu_gem_object_open(struct drm_gem_object *obj,
+ 	/* the context might still be missing when the first ioctl is
+ 	 * DRM_IOCTL_MODE_CREATE_DUMB or DRM_IOCTL_PRIME_FD_TO_HANDLE
+ 	 */
+-	if (!vgdev->has_context_init)
+-		virtio_gpu_create_context(obj->dev, file);
++	virtio_gpu_create_context(obj->dev, file);
+ 
+ 	if (vfpriv->context_created) {
+ 		objs = virtio_gpu_array_alloc(1);

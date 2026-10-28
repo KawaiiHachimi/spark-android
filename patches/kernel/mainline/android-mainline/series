@@ -1,0 +1,4 @@
+0001-selinux-honor-the-mainline-live-image-permissive-boo.patch
+0002-drm-virtio-restore-default-context-creation-for-gene.patch
+0003-kconfig-provide-the-empty-external-configuration-hoo.patch
+0004-drm-nouveau-integrate-GB20B-GSP-610-and-coherent-dis.patch

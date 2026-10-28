@@ -1,0 +1,254 @@
+{
+  "format": 1,
+  "captured": "2026-10-28",
+  "manifest_revision": "ad6b6d6bfc16cb0cd3c39db18685a72a6a43985a",
+  "projects": [
+    {
+      "path": "build/make",
+      "base": "e7cc87a995b25ae412aefa493d2b9c2b0157f29d",
+      "upstream": "https://github.com/LineageOS/android_build",
+      "original_branch": "",
+      "head": "8577ba6c9427a5cd2951c83ffd54f658321bea5c",
+      "tree": "498ffee7f7e520dcbc21f8d33d7dcde991354863",
+      "name": "LineageOS/android_build",
+      "revision": "refs/heads/lineage-24.0",
+      "patches": [
+        {
+          "file": "patches/build/make/0001-build-use-SerialGC-and-a-larger-Java-code-cache.patch",
+          "sha256": "298f4f33042ea95c05c64a84ba4617fe73aa4294cdad534c8f93953baeba0d2a",
+          "bytes": 1009,
+          "uncompressed_bytes": 1009
+        }
+      ],
+      "diffstat": "1 file changed, 1 insertion(+), 2 deletions(-)",
+      "commits": [
+        "8577ba6c9427a5cd2951c83ffd54f658321bea5c build: use SerialGC and a larger Java code cache"
+      ]
+    },
+    {
+      "path": "build/soong",
+      "base": "5ea236479501d50a4a0eafb568f4f35d1bdda3cb",
+      "upstream": "https://github.com/LineageOS/android_build_soong",
+      "original_branch": "",
+      "head": "b76f99bbed601a0d73621a7e30c214eca1c87590",
+      "tree": "633e93ca60a8e689c5a111ca7f3c360562a2d776",
+      "name": "LineageOS/android_build_soong",
+      "revision": "refs/heads/lineage-24.0",
+      "patches": [
+        {
+          "file": "patches/build/soong/0001-java-tune-compiler-JVMs-for-the-Spark-image-build.patch",
+          "sha256": "ec289645b9bb1b84eb4655b6b7d8750ae28e2861c0feab4ef32f50f3a1f70ede",
+          "bytes": 2053,
+          "uncompressed_bytes": 2053
+        }
+      ],
+      "diffstat": "2 files changed, 10 insertions(+), 4 deletions(-)",
+      "commits": [
+        "b76f99bbed601a0d73621a7e30c214eca1c87590 java: tune compiler JVMs for the Spark image build"
+      ]
+    },
+    {
+      "path": "device/mainline/generic",
+      "base": "4e5103bb1c51410d3d0c5305758cd51124276be1",
+      "upstream": "https://github.com/LineageOS/android_device_mainline_generic",
+      "original_branch": "",
+      "head": "f98c3f0de1526e5c4c61a2184d8c09e43fa0d440",
+      "tree": "9a15d8f815143308e2d022109eb9fd09fd6a21ab",
+      "name": "android_device_mainline_generic",
+      "revision": "lineage-24.0",
+      "patches": [
+        {
+          "file": "patches/device/mainline/generic/0001-generic-refresh-mainline-prerequisite-patch-document.patch",
+          "sha256": "a4b13c235f68ab8b8d16fe2a00e8e7fe806daed1a388e05d8512b2ccf742248e",
+          "bytes": 1712,
+          "uncompressed_bytes": 1712
+        },
+        {
+          "file": "patches/device/mainline/generic/0002-generic-integrate-DGX-Spark-graphics-and-arm64-live-.patch",
+          "sha256": "301a4b47b00d52a2a7855846776c85e1ebe482f3d6e50c61b40d7a09eba7d373",
+          "bytes": 11543,
+          "uncompressed_bytes": 11543
+        }
+      ],
+      "diffstat": "9 files changed, 84 insertions(+), 35 deletions(-)",
+      "commits": [
+        "34788c42dac5d096b8dc7016d20223b4fde5bf54 generic: refresh mainline prerequisite patch documentation",
+        "f98c3f0de1526e5c4c61a2184d8c09e43fa0d440 generic: integrate DGX Spark graphics and arm64 live ISO"
+      ]
+    },
+    {
+      "path": "external/mesa",
+      "base": "5a6bb76986d2d111599baf18e1dcd20b5ffd02c4",
+      "upstream": "https://github.com/LineageOS/android_external_mesa",
+      "original_branch": "",
+      "head": "773763de5bd2d5b1e77b451bb85b1cf3e6d3ff16",
+      "tree": "e1e4704f56187f6d29b17e7584d7415ad11645c8",
+      "name": "android_external_mesa",
+      "revision": "lineage-23.2",
+      "patches": [
+        {
+          "file": "patches/external/mesa/0001-mesa-import-upstream-26.2.2-for-Blackwell-support.patch.xz",
+          "sha256": "09d958891189195bf621a45fd4642b9f1594c0b1a453b3dd89d28c5ffaecf24c",
+          "bytes": 76337612,
+          "uncompressed_bytes": 177394419
+        },
+        {
+          "file": "patches/external/mesa/0002-android-integrate-Mesa-26-NVK-with-the-AOSP-build-to.patch",
+          "sha256": "504aa8cc2fe765fd191b0cf78649eb161f5adc4e8cacc7e846b2b26a98b7c9c9",
+          "bytes": 9691,
+          "uncompressed_bytes": 9691
+        },
+        {
+          "file": "patches/external/mesa/0003-nouveau-preserve-NVK-Android-and-nvgpu-integration.patch",
+          "sha256": "55ff92459ee27cf8fd3269ceec4b2f0ffd3cd1fae23b0cd005a6e1ceee5f9fa0",
+          "bytes": 297737,
+          "uncompressed_bytes": 297737
+        },
+        {
+          "file": "patches/external/mesa/0004-mesa-preserve-local-compatibility-and-offline-wrap-m.patch",
+          "sha256": "dd97bf16984bc41b7ebd105e77e6bd55c4f763da019edbd2a757f28b6af9f918",
+          "bytes": 62856,
+          "uncompressed_bytes": 62856
+        }
+      ],
+      "diffstat": "7071 files changed, 1034008 insertions(+), 550678 deletions(-)",
+      "commits": [
+        "42c8a038db50c8be172766926f66c9cf49e8e33a mesa: import upstream 26.2.2 for Blackwell support",
+        "7785c133ee76415b027d18d1f41c62816ce4d300 android: integrate Mesa 26 NVK with the AOSP build tools",
+        "8bfe563d0f4772cf92602e9af5db7b5a5125cc56 nouveau: preserve NVK Android and nvgpu integration",
+        "773763de5bd2d5b1e77b451bb85b1cf3e6d3ff16 mesa: preserve local compatibility and offline wrap metadata"
+      ]
+    },
+    {
+      "path": "external/zstd",
+      "base": "1bfdf8aef6bdec0e817c1f75aeaf382db22de668",
+      "upstream": "https://github.com/LineageOS/android_external_zstd",
+      "original_branch": "",
+      "head": "ab3b52aa32c1f1d4afc916a1e886ef4b015dfb14",
+      "tree": "22ceeff3d7fc621a4feb2eba51dfad611517083e",
+      "name": "LineageOS/android_external_zstd",
+      "revision": "refs/heads/lineage-24.0",
+      "patches": [
+        {
+          "file": "patches/external/zstd/0001-zstd-allow-vendor-subpackages-to-use-libzstd.patch",
+          "sha256": "68fab6ed740ffeb14efdc50234146e9e24cfc20542a535d809952bbb71a59e3c",
+          "bytes": 745,
+          "uncompressed_bytes": 745
+        }
+      ],
+      "diffstat": "1 file changed, 1 insertion(+)",
+      "commits": [
+        "ab3b52aa32c1f1d4afc916a1e886ef4b015dfb14 zstd: allow vendor subpackages to use libzstd"
+      ]
+    },
+    {
+      "path": "frameworks/native",
+      "base": "0ec1966edafb792ffefa81879b24364528f823aa",
+      "upstream": "https://github.com/LineageOS/android_frameworks_native",
+      "original_branch": "",
+      "head": "cccd2c87fbe1aa936be8680aa11ddae37b06c208",
+      "tree": "059bc55c7f9e3f6bb5c4ee128072e2d4fb878c89",
+      "name": "LineageOS/android_frameworks_native",
+      "revision": "refs/heads/lineage-24.0",
+      "patches": [
+        {
+          "file": "patches/frameworks/native/0001-data-expose-the-Vulkan-1.4-feature-XML-as-a-prebuilt.patch",
+          "sha256": "be50629b77a5d8f127df35b6df4ec5b72541940b535c46f48080f53e39b3a3ad",
+          "bytes": 862,
+          "uncompressed_bytes": 862
+        }
+      ],
+      "diffstat": "1 file changed, 6 insertions(+)",
+      "commits": [
+        "cccd2c87fbe1aa936be8680aa11ddae37b06c208 data: expose the Vulkan 1.4 feature XML as a prebuilt"
+      ]
+    },
+    {
+      "path": "system/core",
+      "base": "1375cc767964bbac2070bc41ebc3c864589846b4",
+      "upstream": "https://github.com/LineageOS/android_system_core",
+      "original_branch": "",
+      "head": "59c4402fe613886f954790d5e62c65ad206582b4",
+      "tree": "6a198cfa535ec7eaac72c561ac33b09c016b9b72",
+      "name": "LineageOS/android_system_core",
+      "revision": "refs/heads/lineage-24.0",
+      "patches": [
+        {
+          "file": "patches/system/core/0001-ueventd-search-the-mounted-mainline-firmware-image.patch",
+          "sha256": "ff1a8dc5216d2198fc0daff3acc52dc34f8a37dc50a93c98be922f131633c929",
+          "bytes": 788,
+          "uncompressed_bytes": 788
+        }
+      ],
+      "diffstat": "1 file changed, 1 insertion(+), 1 deletion(-)",
+      "commits": [
+        "59c4402fe613886f954790d5e62c65ad206582b4 ueventd: search the mounted mainline firmware image"
+      ]
+    },
+    {
+      "path": "system/memory/libmeminfo",
+      "base": "d59c960b1fb93377bf68664918031ea5fe709f89",
+      "upstream": "https://android.googlesource.com/platform/system/memory/libmeminfo",
+      "original_branch": "",
+      "head": "499de099ed9f3dda6aa20a67c9a1f526ba6b7aff",
+      "tree": "e9d33c41d635f2ae6f72b39c8616c90a6beafe3e",
+      "name": "platform/system/memory/libmeminfo",
+      "revision": "refs/tags/android-17.0.0_r1",
+      "patches": [
+        {
+          "file": "patches/system/memory/libmeminfo/0001-libmeminfo-handle-kernels-without-the-GPU-memory-BPF.patch",
+          "sha256": "115bc7fc023139064a0de6e26f1a32ba79583230fa7491904a1d82384456f7a4",
+          "bytes": 1575,
+          "uncompressed_bytes": 1575
+        }
+      ],
+      "diffstat": "1 file changed, 10 insertions(+)",
+      "commits": [
+        "499de099ed9f3dda6aa20a67c9a1f526ba6b7aff libmeminfo: handle kernels without the GPU memory BPF map"
+      ]
+    },
+    {
+      "path": "kernel/mainline/android-mainline",
+      "base": "c4617c26c0908a8867a2d57e59023f1c2f435a10",
+      "upstream": "https://android.googlesource.com/kernel/common",
+      "original_branch": "android-mainline",
+      "head": "9d73fe9964f7017ea5c9e3696f21caaad5d87c0b",
+      "tree": "8ae00246378d4dc6377eef660f4520bc5e038d6e",
+      "name": "common",
+      "revision": "android-mainline",
+      "patches": [
+        {
+          "file": "patches/kernel/mainline/android-mainline/0001-selinux-honor-the-mainline-live-image-permissive-boo.patch",
+          "sha256": "230b2b4ce4f524fb7ba9ec32b207921eb408bb3c849398356a6a0ad6ad271710",
+          "bytes": 1268,
+          "uncompressed_bytes": 1268
+        },
+        {
+          "file": "patches/kernel/mainline/android-mainline/0002-drm-virtio-restore-default-context-creation-for-gene.patch",
+          "sha256": "2a3c57bafe208c19ed40b25abf98c37fd1efe9c932376052796f36f25872a8e8",
+          "bytes": 906,
+          "uncompressed_bytes": 906
+        },
+        {
+          "file": "patches/kernel/mainline/android-mainline/0003-kconfig-provide-the-empty-external-configuration-hoo.patch",
+          "sha256": "589bb1154bad697f52f39b701af70a923a4a7cf415686b61a67b631d94be081d",
+          "bytes": 716,
+          "uncompressed_bytes": 716
+        },
+        {
+          "file": "patches/kernel/mainline/android-mainline/0004-drm-nouveau-integrate-GB20B-GSP-610-and-coherent-dis.patch",
+          "sha256": "ebf4510a3023df6467eca43f2e8e701fd41132994438ec79ca82c2afa5e4d566",
+          "bytes": 606646,
+          "uncompressed_bytes": 606646
+        }
+      ],
+      "diffstat": "197 files changed, 10743 insertions(+), 710 deletions(-)",
+      "commits": [
+        "fe616e739431169443a4f155eacf78239424fa51 selinux: honor the mainline live image permissive boot option",
+        "692a4092bdde11237886d6dda6c66ccbd80a38ba drm/virtio: restore default context creation for generic guests",
+        "21d7df1a68e81ca814fcb7008d45e74861d4450d kconfig: provide the empty external configuration hook",
+        "9d73fe9964f7017ea5c9e3696f21caaad5d87c0b drm/nouveau: integrate GB20B, GSP 610 and coherent display support"
+      ]
+    }
+  ]
+}

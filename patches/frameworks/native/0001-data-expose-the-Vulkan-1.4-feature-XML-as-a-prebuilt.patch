@@ -1,0 +1,24 @@
+From cccd2c87fbe1aa936be8680aa11ddae37b06c208 Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:01:30 +0800
+Subject: [PATCH] data: expose the Vulkan 1.4 feature XML as a prebuilt
+
+Change-Id: I641f613207a9b64650f6ada948af80e489e8ffeb
+
+diff --git a/data/etc/Android.bp b/data/etc/Android.bp
+index 0654fe1bdff426e28fb5a2bd302faa4f88660244..2f4171661c30c891c81a73749864a57d63a6a5a2 100644
+--- a/data/etc/Android.bp
++++ b/data/etc/Android.bp
+@@ -430,6 +430,12 @@ prebuilt_etc {
+     defaults: ["frameworks_native_data_etc_defaults"],
+ }
+ 
++prebuilt_etc {
++    name: "android.hardware.vulkan.version-1_4.prebuilt.xml",
++    src: "android.hardware.vulkan.version-1_4.xml",
++    defaults: ["frameworks_native_data_etc_defaults"],
++}
++
+ prebuilt_etc {
+     name: "android.hardware.wifi.prebuilt.xml",
+     src: "android.hardware.wifi.xml",

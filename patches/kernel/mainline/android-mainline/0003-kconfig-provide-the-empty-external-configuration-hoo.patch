@@ -1,0 +1,18 @@
+From 21d7df1a68e81ca814fcb7008d45e74861d4450d Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:01:47 +0800
+Subject: [PATCH 3/4] kconfig: provide the empty external configuration hook
+
+
+diff --git a/Kconfig.ext b/Kconfig.ext
+new file mode 100644
+index 0000000000000000000000000000000000000000..e03fbe9524c9591d122f84f0181e404389fd3fad
+--- /dev/null
++++ b/Kconfig.ext
+@@ -0,0 +1,6 @@
++# Empty external Kconfig hook.
++#
++# android-mainline's top-level Kconfig unconditionally sources
++# $(KCONFIG_EXT_PREFIX)Kconfig.ext.  The generic mainline device tree supplies
++# its options through gki_defconfig and merge_config fragments, so there is no
++# external Kconfig project required here.

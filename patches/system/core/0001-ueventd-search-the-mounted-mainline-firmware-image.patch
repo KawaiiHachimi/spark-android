@@ -1,0 +1,20 @@
+From 59c4402fe613886f954790d5e62c65ad206582b4 Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:01:30 +0800
+Subject: [PATCH] ueventd: search the mounted mainline firmware image
+
+Change-Id: I494926627561861d87b4ac83ca27ec4066c532a4
+
+diff --git a/rootdir/ueventd.rc b/rootdir/ueventd.rc
+index 80ef6a1074ed1b3b9c7205c2ddcc115fa8c7506a..08907b6a8ce60aad96013cd11b81a0719b206e92 100644
+--- a/rootdir/ueventd.rc
++++ b/rootdir/ueventd.rc
+@@ -1,7 +1,7 @@
+ import /vendor/etc/ueventd.rc
+ import /odm/etc/ueventd.rc
+ 
+-firmware_directories /etc/firmware/ /odm/firmware/ /vendor/firmware/ /firmware/image/
++firmware_directories /etc/firmware/ /odm/firmware/ /vendor/firmware/ /firmware/image/ /mnt/vendor/firmware/
+ uevent_socket_rcvbuf_size 16M
+ 
+ subsystem graphics

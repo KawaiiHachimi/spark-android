@@ -1,0 +1,257 @@
+From f98c3f0de1526e5c4c61a2184d8c09e43fa0d440 Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:01:47 +0800
+Subject: [PATCH 2/2] generic: integrate DGX Spark graphics and arm64 live ISO
+
+Enable NVK/Zink, atomic Nouveau and late firmware-aware module loading.
+Keep the GBM allocator in the vendor namespace and advertise Vulkan 1.4.
+Build arm64 live media with host GRUB; preserve current debug settings and build limits.
+
+diff --git a/BoardConfig.mk b/BoardConfig.mk
+index 8bce5060e5534247a81964032d43affefa183627..3e406c30123565e135fe10a1599bb05adf86f14f 100644
+--- a/BoardConfig.mk
++++ b/BoardConfig.mk
+@@ -41,20 +41,31 @@ TARGET_USERIMAGES_SPARSE_EXT_DISABLED := true
+ TARGET_USERIMAGES_USE_F2FS := true
+ TARGET_USERIMAGES_USE_EXT4 := true
+ 
++# Kernel builds default to -j$(nproc) in Lineage's BoardConfigKernel.mk.
++# With the full Android build running in parallel that makes lld segfault
++# while linking large objects and modules, so cap the kernel jobs.
++TARGET_KERNEL_ADDITIONAL_FLAGS += -j8
++
+ # Graphics (Mesa)
+ BOARD_MESA3D_BUILD_LIBGBM := true
++# Mesa 26 requires LLVM >= 18 for RadeonSI (and for the AMD Vulkan driver when
++# it is built with LLVM), but this tree only ships swiftshader's LLVM 16 for
++# the target.  The AMD drivers are not useful on the arm64 targets this ISO
++# targets, so leave them out instead of failing the LLVM version check.
+ BOARD_MESA3D_GALLIUM_DRIVERS += \
+     nouveau \
+-    radeonsi \
+-    r300 \
+-    r600 \
+     svga \
+     virgl
+ BOARD_MESA3D_VULKAN_DRIVERS += \
+-    amd \
+     nouveau \
+     virtio
+ 
++# Use the prebuilt CLC tools shipped in prebuilts/mesa-build-dep instead of
++# linking against a system libclc, which AOSP does not provide.
++BOARD_MESA3D_MESON_ARGS += \
++    -Dmesa-clc=system \
++    -Dprecomp-compiler=system
++
+ # Graphics allocator
+ $(call soong_config_set_bool,minigbm_upstream,disable_virgl_native_yuv,true)
+ 
+diff --git a/Generic_arm64/BoardConfig.mk b/Generic_arm64/BoardConfig.mk
+index 72b9a9d6b2b09d27789848d8122432f21166a4fa..b7395185151c31b087a85f73e2a810618ae47700 100644
+--- a/Generic_arm64/BoardConfig.mk
++++ b/Generic_arm64/BoardConfig.mk
+@@ -19,8 +19,6 @@ TARGET_GRUB_ARCH := arm64-efi
+ # Graphics (Mesa)
+ BOARD_MESA3D_GALLIUM_DRIVERS += \
+     asahi \
+-    ethosu \
+-    etnaviv \
+     freedreno \
+     lima \
+     nouveau \
+@@ -29,6 +27,12 @@ BOARD_MESA3D_GALLIUM_DRIVERS += \
+     v3d \
+     vc4
+ #    rocket
++# Nouveau has no GL driver past Ada.  Mesa's loader detects chipset >= 0x1a0
++# (Blackwell) and silently redirects the nouveau driver name to zink, so zink
++# has to be present or EGL/GLES fails to initialise and SurfaceFlinger loops.
++# Zink rides on the Vulkan driver, which for Blackwell is NVK.
++BOARD_MESA3D_GALLIUM_DRIVERS += \
++    zink
+ 
+ BOARD_MESA3D_VULKAN_DRIVERS += \
+     asahi \
+diff --git a/apex/org.lineageos.device.graphics.vulkan.no_apex/Android.bp b/apex/org.lineageos.device.graphics.vulkan.no_apex/Android.bp
+index cb3bcdac9144e331c8c52766557f6e378acf79e7..ec46eab973a00338d6aae5e677bfb75f973c91f6 100644
+--- a/apex/org.lineageos.device.graphics.vulkan.no_apex/Android.bp
++++ b/apex/org.lineageos.device.graphics.vulkan.no_apex/Android.bp
+@@ -14,6 +14,11 @@ apex {
+ 
+     prebuilts: [
+         "org.lineageos.device.graphics.vulkan.no_apex.rc",
++        "android.hardware.vulkan.compute-0.prebuilt.xml",
++        "android.hardware.vulkan.level-1.prebuilt.xml",
++        "android.hardware.vulkan.version-1_4.prebuilt.xml",
++        "android.software.opengles.deqp.level-latest.prebuilt.xml",
++        "android.software.vulkan.deqp.level-latest.prebuilt.xml",
+     ],
+ }
+ 
+diff --git a/build/tasks/20-liveisoimage.mk b/build/tasks/20-liveisoimage.mk
+index e7ff2a56a7d0462dada59a1aea7b9c41b811f504..ea9a97af9edf162cb552039f58abad206dabbb86 100644
+--- a/build/tasks/20-liveisoimage.mk
++++ b/build/tasks/20-liveisoimage.mk
+@@ -4,7 +4,7 @@
+ #
+ 
+ ifeq ($(USES_DEVICE_MAINLINE_GENERIC),true)
+-ifeq ($(TARGET_DEVICE),Generic_x86_64)
++ifeq ($(filter Generic_x86_64 Generic_arm64,$(TARGET_DEVICE)),$(TARGET_DEVICE))
+ 
+ INSTALLED_LIVEISOIMAGE_TARGET := $(PRODUCT_OUT)/$(BOOTMGR_ARTIFACT_FILENAME_PREFIX)-live.iso
+ 
+@@ -21,7 +21,8 @@ INSTALLED_LIVEISOIMAGE_TARGET_INCLUDE_FILES += \
+ endif
+ 
+ INSTALLED_LIVEISOIMAGE_TARGET_DEPS := \
+-	$(INSTALLED_LIVEISOIMAGE_TARGET_INCLUDE_FILES)
++	$(INSTALLED_LIVEISOIMAGE_TARGET_INCLUDE_FILES) \
++	$(TARGET_LINUX_FIRMWARE_IMAGE)
+ 
+ ifeq ($(TARGET_LINUX_FIRMWARE_IMAGE),)
+ $(warning TARGET_LINUX_FIRMWARE_IMAGE is empty, please set it to path to image with linux-firmware on its root)
+@@ -38,6 +39,19 @@ TARGET_GRUB_2ND_ARCH_HOST_PREBUILT_TAG ?= $(HOST_PREBUILT_TAG)
+ GRUB_PREBUILT_DIR := prebuilts/bootmgr/grub/$(TARGET_GRUB_HOST_PREBUILT_TAG)/$(TARGET_GRUB_ARCH)
+ GRUB_2ND_ARCH_PREBUILT_DIR := prebuilts/bootmgr/grub/$(TARGET_GRUB_2ND_ARCH_HOST_PREBUILT_TAG)/$(TARGET_GRUB_2ND_ARCH)
+ 
++# The prebuilt arm64 grub tools are aarch64 host binaries, so they cannot run
++# on an x86_64 build host.  Use the host grub-mkrescue with the cross grub
++# modules from grub-efi-arm64-bin instead.
++ifeq ($(TARGET_ARCH),arm64)
++GRUB_MKRESCUE_EXEC := /usr/bin/grub-mkrescue
++GRUB_MODULES_DIR := /usr/lib/grub/arm64-efi
++GRUB_RUN_ENV := PATH=$(BOOTMGR_TOOLS_BIN_DIR):$$PATH
++else
++GRUB_MKRESCUE_EXEC := $(GRUB_PREBUILT_DIR)/bin/grub-mkrescue
++GRUB_MODULES_DIR := $(GRUB_PREBUILT_DIR)/lib/grub/$(TARGET_GRUB_ARCH)
++GRUB_RUN_ENV := $(BOOTMGR_PATH_OVERRIDE) $(BOOTMGR_TOOLS_64_EXEC_ENV)
++endif
++
+ GRUB_WORKDIR_BASE := $(TARGET_OUT_INTERMEDIATES)/GRUB_OBJ
+ GRUB_WORKDIR_LIVE := $(GRUB_WORKDIR_BASE)/live
+ 
+@@ -51,8 +65,8 @@ define make-liveisoimage-target
+ 	cat $(TARGET_GRUB_LIVE_CONFIGS) > $(GRUB_WORKDIR_LIVE)/fsroot/boot/grub/grub.cfg
+ 	$(call process-bootmgr-cfg-common,$(GRUB_WORKDIR_LIVE)/fsroot/boot/grub/grub.cfg)
+ 
+-	$(BOOTMGR_PATH_OVERRIDE) $(BOOTMGR_TOOLS_64_EXEC_ENV) $(GRUB_PREBUILT_DIR)/bin/grub-mkrescue \
+-		-d $(GRUB_PREBUILT_DIR)/lib/grub/$(TARGET_GRUB_ARCH) \
++	$(GRUB_RUN_ENV) $(GRUB_MKRESCUE_EXEC) \
++		-d $(GRUB_MODULES_DIR) \
+ 		-o $(1) \
+ 		--xorriso=$(BOOTMGR_XORRISO_EXEC) \
+ 		$(GRUB_WORKDIR_LIVE)/fsroot \
+@@ -77,5 +91,5 @@ liveisoimage-nodeps:
+ 	@echo "make $(INSTALLED_LIVEISOIMAGE_TARGET): ignoring dependencies"
+ 	$(call make-liveisoimage-target,$(INSTALLED_LIVEISOIMAGE_TARGET))
+ 
+-endif # TARGET_DEVICE == Generic_x86_64
++endif # TARGET_DEVICE == Generic_x86_64 or Generic_arm64
+ endif # USES_DEVICE_MAINLINE_GENERIC
+diff --git a/configs/bootmgr/live/grub.cfg b/configs/bootmgr/live/grub.cfg
+index b3727f028678d2a6de02a6ffff1cc1d049204d3b..c4ee18e37fcdbef7610ee44908d7aa993711d481 100644
+--- a/configs/bootmgr/live/grub.cfg
++++ b/configs/bootmgr/live/grub.cfg
+@@ -30,7 +30,7 @@ function boot_android {
+ }
+ 
+ function boot_android_with_default_mount_options {
+-    boot_android androidboot.mount_system=imgs androidboot.mount_userdata=tmpfs androidboot.mount_firmware=${androidboot_mount_firmware} $@
++    boot_android androidboot.mount_system=imgs androidboot.mount_userdata=tmpfs androidboot.mount_firmware=${androidboot_mount_firmware} nouveau.atomic=1 $@
+ }
+ 
+ menuentry "@BOOTMGR_ANDROID_DISTRIBUTION_NAME@ Live" {
+@@ -53,7 +53,7 @@ menuentry "@BOOTMGR_ANDROID_DISTRIBUTION_NAME@ Live (Enable serial console)" {
+ }
+ 
+ menuentry "@BOOTMGR_ANDROID_DISTRIBUTION_NAME@ Live (Skip mounting firmware)" {
+-    boot_android androidboot.mount_system=imgs androidboot.mount_userdata=tmpfs androidboot.mount_firmware=false
++    boot_android androidboot.mount_system=imgs androidboot.mount_userdata=tmpfs androidboot.mount_firmware=false androidboot.insecure_adb=true
+ }
+ 
+ submenu "Advanced graphics options for @BOOTMGR_ANDROID_DISTRIBUTION_NAME@ Live" {
+diff --git a/configs/init/init.generic.rc b/configs/init/init.generic.rc
+index 94971a329557f506598bef114c65a36217fbdc0d..f863bf2f9536ced66b6d843375f5b0328e9b557e 100644
+--- a/configs/init/init.generic.rc
++++ b/configs/init/init.generic.rc
+@@ -77,6 +77,15 @@ service vendor.light-default /vendor/bin/hw/android.hardware.light-service.linea
+ on early-init
+     exec u:r:vendor_modprobe:s0 -- /vendor/bin/modprobe -d /vendor/lib/modules zram.ko
+ 
++# nouveau is deliberately not in modules.load: loading it from the ramdisk
++# phase makes its GSP firmware request fail, because the ramdisk ueventd
++# config does not search /mnt/vendor/firmware yet (the firmware image is
++# mounted, but not in the search list).  Load it here instead, which is after
++# the partitions are up and still before the system init's early-init runs
++# hardware_detect.
++on early-init
++    exec u:r:vendor_modprobe:s0 -- /vendor/bin/modprobe -d /vendor/lib/modules nouveau
++
+ on init
+     # Undo the override from system init.rc
+     write /proc/sys/kernel/modprobe /vendor/bin/modprobe_kernel
+@@ -92,6 +101,15 @@ on late-fs
+ on post-fs-data && property:ro.boot.wifi_impl=virt_wifi
+     start setup_wifi
+ 
++# The GBM gralloc HAL redirects its stdout/stderr into /data/vendor/*.log.
++# init.rc creates that directory as 0771 root:root, so the HAL (which runs as
++# `system`) cannot create the files, freopen() then closes fd 1 and 2, and
++# both its own logging and Mesa's loader errors are lost - the DRM fd even
++# ends up being fd 1.  /data is a tmpfs on the live image, so opening the
++# directory up costs nothing there.
++on post-fs-data
++    chmod 0777 /data/vendor
++
+ # Wi-Fi
+ on early-init
+     exec u:r:su:s0 -- /vendor/bin/toybox_vendor rfkill unblock all
+diff --git a/configs/modprobe/modules.options b/configs/modprobe/modules.options
+index d8138e36fa1afe355e1fdf79773694eef64f276d..5b8c17e76ac30cdecd2da7e6948d917845b68272 100644
+--- a/configs/modprobe/modules.options
++++ b/configs/modprobe/modules.options
+@@ -1,2 +1,8 @@
+ options amdgpu cik_support=1 si_support=1
+ options radeon cik_support=0 si_support=0
++
++# nouveau disables atomic modesetting by default (nouveau.atomic=0).  Without
++# it hardware_detect falls back to drmfb-composer, which cannot initialise on
++# a real GPU and makes SurfaceFlinger abort with "Can't create
++# AidlComposerClient".  With atomic enabled it selects drm_hwcomposer instead.
++options nouveau atomic=1
+diff --git a/device.mk b/device.mk
+index a23b67d170092224f3eaa3b6b6fd722571a3fb07..61d1b88999003fdb676d171c03d161ad9a92b115 100644
+--- a/device.mk
++++ b/device.mk
+@@ -6,6 +6,7 @@
+ DEVICE_PATH := device/mainline/generic
+ 
+ # Inherit from mainline/common
++MAINLINE_COMMON_PREFER_EXT_MODULES := true
+ TARGET_CONSOLE_AS_ROOT := true
+ TARGET_ENABLE_LOGCAT_TO_SERIAL := true
+ TARGET_ENABLE_FBKEYBOARD := true
+@@ -43,9 +44,20 @@ PRODUCT_PACKAGES += \
+ TARGET_MESA_ENABLE_SOFTWARE_RENDERER := true
+ 
+ # Graphics allocator
++# The GBM gralloc HAL is installed in /vendor rather than inside the
++# com.android.hardware.graphics.allocator.gm APEX on purpose.  Mesa's GBM
++# backend (dri_gbm.so) links libgallium_dri.so, which lives in /vendor/lib64,
++# and an APEX namespace only lists /vendor/${LIB} under permittedPaths - that
++# allows dlopen() by absolute path but is not used to resolve dependencies, so
++# gbm_create_device() fails with:
++#   MESA-LOADER: failed to open dri: dlopen failed: library
++#   "libgallium_dri.so" not found: needed by /vendor/lib64/dri_gbm.so in
++#   namespace com_android_hardware_graphics_allocator
++# Running the very same binary from /vendor puts it in the vendor namespace,
++# which does search /vendor/lib64, so the dependency resolves.
+ PRODUCT_PACKAGES += \
+     com.android.hardware.graphics.allocator.fb \
+-    com.android.hardware.graphics.allocator.gm
++    android.hardware.graphics.allocator-service.gm
+ 
+ PRODUCT_PACKAGES += \
+     mapper.fb \

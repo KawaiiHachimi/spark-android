@@ -1,0 +1,22 @@
+[
+  {
+    "path": "nvidia/gb20b/gsp/bootloader-610.43.03.bin",
+    "bytes": 213108,
+    "sha256": "6a16b9f0362db0d1d327910dd600bdff50c40b6ed1a69dfdb2ef19e112b2cfa1"
+  },
+  {
+    "path": "nvidia/gb20b/gsp/fmc-610.43.03.bin",
+    "bytes": 213448,
+    "sha256": "c5fa671ce7b9ba7b4ce0fb08eba60fa5465542255b3bbf3004f3d77d45240cab"
+  },
+  {
+    "path": "nvidia/gb20b/gsp/gsp-610.43.03.bin",
+    "bytes": 84277400,
+    "sha256": "572373620a37418f24dc16b5031c39338778c3257e48e8408de9a57291b24f3a"
+  },
+  {
+    "path": "nvidia/gb20b/gsp/ucodes-610.43.03.bin",
+    "bytes": 31744,
+    "sha256": "3a36ceb211c20694f3d2e33ade2bbd2c3ae0b61ba2f28eaff4362aac547a632c"
+  }
+]

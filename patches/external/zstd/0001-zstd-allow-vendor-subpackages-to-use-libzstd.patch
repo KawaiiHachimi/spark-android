@@ -1,0 +1,19 @@
+From ab3b52aa32c1f1d4afc916a1e886ef4b015dfb14 Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:01:30 +0800
+Subject: [PATCH] zstd: allow vendor subpackages to use libzstd
+
+Change-Id: I1604509646f649abd06f911815947f47c26243ec
+
+diff --git a/Android.bp b/Android.bp
+index 51f5d112f94d45c589827fe4921708bbe0b99799..1c78aa1093ee74a149ca7e1fb19777929f0a8ffe 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -91,6 +91,7 @@ cc_library {
+         "//system/extras/simpleperf:__subpackages__",
+         "//system/fs/fs_mgr/libsnapshot:__subpackages__",
+         "//system/unwinding/libunwindstack:__subpackages__",
++        "//vendor:__subpackages__",
+         "//test/pts:__subpackages__",
+     ],
+     product_available: true,

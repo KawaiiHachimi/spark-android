@@ -1,0 +1,22 @@
+[
+  {
+    "path": "mesa-host-tools/bin/asahi_clc",
+    "bytes": 33560736,
+    "sha256": "7f26b1dc530b15acdb04ad23cfe1a5e62160d1e07bb3e7ea3f7318e6b8afc314"
+  },
+  {
+    "path": "mesa-host-tools/bin/panfrost_compile",
+    "bytes": 40523888,
+    "sha256": "5d5b09485b7f71b9af42a0c0937e067d37d6cb08596bd8ff9aa7995d4b4e89a6"
+  },
+  {
+    "path": "mesa-host-tools/bin/pco_clc",
+    "bytes": 35856224,
+    "sha256": "1c2966beed145fe516b9e645ae86141b47eebdfcaa2716b58afeeff8cb78a56e"
+  },
+  {
+    "path": "mesa-host-tools/bin/vtn_bindgen2",
+    "bytes": 26883304,
+    "sha256": "b10ce52b9fb01ae6e5286fc908be55dac6dee11da5aac0360c78dc4b124250f4"
+  }
+]

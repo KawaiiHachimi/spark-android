@@ -1,0 +1,50 @@
+From 34788c42dac5d096b8dc7016d20223b4fde5bf54 Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:01:47 +0800
+Subject: [PATCH 1/2] generic: refresh mainline prerequisite patch
+ documentation
+
+
+diff --git a/docs/patches.md b/docs/patches.md
+index 3f958544c0ce201c7705e9dbd5c43b21d0bdaed5..ca2831a7afaab518c4ccaac7e377f72cef666cbf 100644
+--- a/docs/patches.md
++++ b/docs/patches.md
+@@ -8,7 +8,6 @@ Run these:
+ 
+ ```
+ repopick -t c2-rgb
+-repopick -t lineage-light-disable-backlight
+ repopick -t mainline-kernel
+ ```
+ 
+@@ -27,16 +26,6 @@ For `lineage-24.0` branch:
+ 
+ You can run `repopick [change number ...]` to pick these patches.
+ 
+-## hardware/interfaces
+-
+-For `lineage-24.0` branch:
+-
+-| Change id | Change number | Commit message |
+-|---------------|-----------|----------------|
+-| `Ife4de11c0b0646ad5577d0d37a4d28bc25de1cfa` | 501200 | `bluetooth/aidl/default: Fix 100% CPU spin while waiting for the HCI interface` |
+-
+-You can run `repopick [change number ...]` to pick these patches.
+-
+ ## kernel/mainline/android-mainline
+ 
+ - `drm/vmwgfx: add ABGR8888 to vmw_primary_plane_formats[]`: https://review.lineageos.org/c/LineageOS/android_kernel_virt_virtio/+/423579
+@@ -58,13 +47,3 @@ You can run `repopick [change number ...]` to pick these patches.
+ ## system/memory/libmeminfo
+ 
+ Apply from [here](../.patches/system/memory/libmeminfo).
+-
+-## vendor/lineage
+-
+-For `lineage-24.0` branch:
+-
+-| Change id | Change number | Commit message |
+-|---------------|-----------|----------------|
+-| `I2b9f0524d89e03779fde5a36516c3e8cc4c40c11` | 501163 | `kernel: Probe libclang before using it for rust bindgen` |
+-
+-You can run `repopick [change number ...]` to pick these patches.

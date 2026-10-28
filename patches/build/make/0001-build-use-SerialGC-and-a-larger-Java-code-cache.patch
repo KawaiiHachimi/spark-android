@@ -1,0 +1,20 @@
+From 8577ba6c9427a5cd2951c83ffd54f658321bea5c Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:01:30 +0800
+Subject: [PATCH] build: use SerialGC and a larger Java code cache
+
+Preserve the current build-host JVM workaround used for the Spark image.
+
+Change-Id: I7de3925892c3bd1cc719e4dfe89390b0a23fb372
+
+diff --git a/core/combo/javac.mk b/core/combo/javac.mk
+index 32a5c9ebcd77b856c2e7fa30ebcefcb3a679b827..5256abee9c500baa42d668190b7e312b12bfa06d 100644
+--- a/core/combo/javac.mk
++++ b/core/combo/javac.mk
+@@ -16,5 +16,4 @@ ANDROID_JAVA_TOOLCHAIN := $(ANDROID_JAVA_HOME)/bin
+ 
+ # TODO(ccross): remove this, it is needed for now because it is used by
+ # config.mk before makevars from soong are loaded
+-JAVA := $(ANDROID_JAVA_TOOLCHAIN)/java -XX:OnError="cat hs_err_pid%p.log" -XX:CICompilerCount=6 -XX:+UseDynamicNumberOfGCThreads
+-
++JAVA := $(ANDROID_JAVA_TOOLCHAIN)/java -XX:OnError="cat hs_err_pid%p.log" -XX:CICompilerCount=6 -XX:+UseSerialGC -XX:ReservedCodeCacheSize=512m

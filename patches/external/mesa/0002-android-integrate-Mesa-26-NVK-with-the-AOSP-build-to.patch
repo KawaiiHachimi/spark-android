@@ -1,0 +1,175 @@
+From 7785c133ee76415b027d18d1f41c62816ce4d300 Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:02:14 +0800
+Subject: [PATCH 2/4] android: integrate Mesa 26 NVK with the AOSP build tools
+
+Add Vulkan library mappings, Rust cross arguments, target bindgen headers and
+matching host-tool search paths. Retain local bindgen compatibility workarounds.
+
+diff --git a/android/Android.mk b/android/Android.mk
+index aaddb17a8a4e21865979da25d770bd79786d631e..d8b834968e99ed3c5e90624c1f9d5a9687786638 100644
+--- a/android/Android.mk
++++ b/android/Android.mk
+@@ -50,7 +50,10 @@ MESA_VK_LIB_SUFFIX_freedreno := freedreno
+ MESA_VK_LIB_SUFFIX_broadcom := broadcom
+ MESA_VK_LIB_SUFFIX_panfrost := panfrost
+ MESA_VK_LIB_SUFFIX_virtio := virtio
+-MESA_VK_LIB_SUFFIX_swrast := lvp
++MESA_VK_LIB_SUFFIX_asahi := asahi
++MESA_VK_LIB_SUFFIX_imagination := powervr_mesa
++MESA_VK_LIB_SUFFIX_swrast := lvp_mesa3d
++MESA_VK_LIB_SUFFIX_nouveau := nouveau
+ 
+ include $(CLEAR_VARS)
+ 
+@@ -152,11 +155,15 @@ endif
+ 
+ #-------------------------------------------------------------------------------
+ 
++MESA3D_LIBS :=
++
+ # $1: name
+ # $2: subdir
+ # $3: source prebuilt
+ # $4: export headers
+ define mesa3d-lib
++MESA3D_LIBS += $1
++
+ include $(CLEAR_VARS)
+ LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+ LOCAL_MODULE := $1
+@@ -209,6 +216,12 @@ $(eval $(call mesa3d-lib,$(MESA_LIBGBM_NAME),,MESA3D_LIBGBM_BIN,$(MESA3D_TOP)/sr
+ $(eval $(call mesa3d-lib,dri_gbm,,MESA3D_DRI_GBM_BIN))
+ endif
+ 
++include $(CLEAR_VARS)
++LOCAL_MODULE := mesa3d
++LOCAL_MODULE_TAGS := optional
++LOCAL_REQUIRED_MODULES := $(MESA3D_LIBS)
++include $(BUILD_PHONY_PACKAGE)
++
+ #-------------------------------------------------------------------------------
+ 
+ endif
+diff --git a/android/mesa3d_cross.mk b/android/mesa3d_cross.mk
+index 8e709a435abb4257de30186ecde31b86598f17ab..4b847c052f169a4af49fdd45d161eae53d080c90 100644
+--- a/android/mesa3d_cross.mk
++++ b/android/mesa3d_cross.mk
+@@ -82,8 +82,21 @@ MESA3D_GLES_BINS := \
+     $($(M_TARGET_PREFIX)MESA3D_LIBGLESV1_BIN) \
+     $($(M_TARGET_PREFIX)MESA3D_LIBGLESV2_BIN) \
+ 
++# Keep the entries absolute: the meson configure step cds into the build
++# directory first, so a relative out/host/linux-x86/bin would no longer
++# resolve and the AOSP path interposer stub for bindgen would be picked up
++# from $$PATH instead.  prebuilts/clang-tools must come before it as well.
++# nvk-rust-bin holds the rustc wrapper that hides the "-dev" suffix of the
++# AOSP rustc from meson (bindgen rejects that version) and forces panic=abort
++# for the Android targets.
++# mesa-host-tools holds host tools (vtn_bindgen2, asahi_clc, panfrost_compile,
++# pco_clc) rebuilt from this Mesa version.  The copies shipped in
++# prebuilts/mesa-build-dep come from the Mesa 25.3.3 branch and abort on the
++# newer NIR intrinsics, so they have to be shadowed.
++MESA3D_AOSP_PREBUILTS_PATH := $(AOSP_ABSOLUTE_PATH)/mesa-host-tools/bin:$(AOSP_ABSOLUTE_PATH)/nvk-rust-bin:$(AOSP_ABSOLUTE_PATH)/prebuilts/clang-tools/linux-x86/bin:$(AOSP_ABSOLUTE_PATH)/$(HOST_OUT_EXECUTABLES):$(AOSP_ABSOLUTE_PATH)/prebuilts/rust-toolchain/linux-x86/1.93.1/bin
++
+ MESON_GEN_NINJA := \
+-	cd $(MESON_OUT_DIR) && PATH=/usr/bin:/usr/local/bin:$$PATH meson ./build     \
++	cd $(MESON_OUT_DIR) && PATH=$(MESA3D_AOSP_PREBUILTS_PATH):$(AOSP_ABSOLUTE_PATH)/prebuilts/mesa-build-dep/bin:/usr/bin:/usr/local/bin:$$PATH meson ./build \
+ 	--cross-file $(call relative-to-absolute,$(MESON_GEN_DIR))/aosp_cross        \
+ 	--buildtype=release                                                          \
+ 	-Dplatforms=android                                                          \
+@@ -98,9 +111,10 @@ MESON_GEN_NINJA := \
+ 	-Dcpp_rtti=false                                                             \
+ 	-Dlmsensors=disabled                                                         \
+ 	-Dandroid-libbacktrace=disabled                                              \
++	-Dallow-fallback-for=libdrm                                                  \
+ 	$(BOARD_MESA3D_MESON_ARGS)                                                   \
+ 
+-MESON_BUILD := PATH=/usr/bin:/bin:/sbin:$$PATH ninja -C $(MESON_OUT_DIR)/build
++MESON_BUILD := PATH=$(MESA3D_AOSP_PREBUILTS_PATH):$(AOSP_ABSOLUTE_PATH)/prebuilts/mesa-build-dep/bin:/usr/bin:/bin:/sbin:$$PATH ninja -C $(MESON_OUT_DIR)/build
+ 
+ $(MESON_GEN_FILES_TARGET): MESON_CPU_FAMILY := $(subst arm64,aarch64,$(TARGET_$(M_TARGET_PREFIX)ARCH))
+ 
+@@ -153,6 +167,9 @@ $(MESON_GEN_FILES_TARGET): PRIVATE_TARGET_LIBCRT_BUILTINS := $(my_target_libcrt_
+ $(MESON_GEN_FILES_TARGET): PRIVATE_TARGET_LIBATOMIC := $(my_target_libatomic)
+ $(MESON_GEN_FILES_TARGET): PRIVATE_TARGET_CRTBEGIN_SO_O := $(my_target_crtbegin_so_o)
+ $(MESON_GEN_FILES_TARGET): PRIVATE_TARGET_CRTEND_SO_O := $(my_target_crtend_so_o)
++$(MESON_GEN_FILES_TARGET): PRIVATE_TARGET_TRIPLE := $(my_target_triple)$(PLATFORM_SDK_VERSION)
++$(MESON_GEN_FILES_TARGET): PRIVATE_TARGET_RUST_TRIPLE := $(subst armv7a-linux-androideabi,armv7-linux-androideabi,$(my_target_triple))
++$(MESON_GEN_FILES_TARGET): PRIVATE_TARGET_UAPI_ARCH := $(subst x86_64,x86,$(TARGET_$(M_TARGET_PREFIX)ARCH))
+ ##
+ 
+ define m-lld-flags
+@@ -251,11 +268,14 @@ $(MESON_GEN_FILES_TARGET): $(sort $(shell find -L $(MESA3D_TOP) -not -path '*/\.
+                              $(foreach inc,$(nospace-includes),'$(call abs-include,$(inc))', )'']\n" \
+ 		"c_link_args = [$(foreach flag, $(m-lld-flags-cleaned),'$(flag)',)'']\n"                                          \
+ 		"cpp_link_args = [$(foreach flag, $(m-lld-flags-cleaned),'$(flag)',)'']\n"                                        \
++		"bindgen_clang_arguments = ['-target', '$(PRIVATE_TARGET_TRIPLE)', '-nostdinc', '-isystem', '$(AOSP_ABSOLUTE_PATH)/prebuilts/clang/host/linux-x86/clang-r584948/lib/clang/22/include', '-isystem', '$(AOSP_ABSOLUTE_PATH)/bionic/libc/include', '-isystem', '$(AOSP_ABSOLUTE_PATH)/bionic/libc/kernel/uapi', '-isystem', '$(AOSP_ABSOLUTE_PATH)/bionic/libc/kernel/android/uapi', '-isystem', '$(AOSP_ABSOLUTE_PATH)/bionic/libc/kernel/uapi/asm-$(PRIVATE_TARGET_UAPI_ARCH)', '-I$(AOSP_ABSOLUTE_PATH)/external/libdrm']\n" \
+ 		"needs_exe_wrapper = true\n"                                                                                      \
++		"skip_sanity_check = true\n"                                                                                      \
+ 		"[binaries]\n"                                                                                                    \
+ 		"ar = '$(AOSP_ABSOLUTE_PATH)/$($($(M_TARGET_PREFIX))TARGET_AR)'\n"                                                \
+ 		"c = [$(foreach arg,$(PRIVATE_CC),'$(subst prebuilts/,$(AOSP_ABSOLUTE_PATH)/prebuilts/,$(arg))',)'']\n"           \
+ 		"cpp = [$(foreach arg,$(PRIVATE_CXX),'$(subst prebuilts/,$(AOSP_ABSOLUTE_PATH)/prebuilts/,$(arg))',)'']\n"        \
++		"rust = ['rustc', '--target', '$(PRIVATE_TARGET_RUST_TRIPLE)', '-C', 'panic=abort', '-C', 'link-args=-target $(PRIVATE_TARGET_RUST_TRIPLE) -lc']\n" \
+ 		"c_ld = 'lld'\n"                                                                                                  \
+ 		"cpp_ld = 'lld'\n\n"                                                                                              \
+ 		"pkgconfig = ['env', 'PKG_CONFIG_LIBDIR=' + '$(call relative-to-absolute,$(MESON_GEN_DIR))', '/usr/bin/pkg-config']\n\n" \
+diff --git a/meson.build b/meson.build
+index d6e3a8bea260e47bdac88cdf2fe983e47f96afe8..cbca86e34f51d029817fbb68b91becc65cf38502 100644
+--- a/meson.build
++++ b/meson.build
+@@ -883,7 +883,6 @@ if with_gallium_rusticl or with_nouveau_vk or with_tools.contains('etnaviv') or
+   bindgen_bad_versions = [
+     # unknown covers buggy 0.69.0, 0.71.0
+     'unknown',
+-    '0.72.0',
+   ]
+   if bindgen_version in bindgen_bad_versions
+     error('Your bingden version is known to be buggy, please upgrade it. ' +
+@@ -931,7 +930,6 @@ if with_gallium_rusticl or with_nouveau_vk or with_tools.contains('etnaviv') or
+     '-Ddeprecated_safe_2024',
+     '-Dimpl_trait_overcaptures',
+     '-Dkeyword_idents_2024',
+-    '-Dmissing_unsafe_on_extern',
+     '-Dnever_type_fallback_flowing_into_unsafe',
+     '-Drust_2024_guarded_string_incompatible_syntax',
+     '-Drust_2024_incompatible_pat',
+diff --git a/src/compiler/rust/meson.build b/src/compiler/rust/meson.build
+index e1bfc800a8a48de7160d52439131ab93e327ddea..75269724031cf7cf91f12f6dc0a80564d6b3268a 100644
+--- a/src/compiler/rust/meson.build
++++ b/src/compiler/rust/meson.build
+@@ -127,7 +127,6 @@ _libcompiler_bindings = static_library(
+   ],
+   dependencies : [
+     idep_nir_headers,
+-    idep_mesautil,
+   ],
+ )
+ 
+diff --git a/src/gallium/targets/lavapipe/meson.build b/src/gallium/targets/lavapipe/meson.build
+index 41de1e5a0f1166d12632fd6cafd4a8e96538101d..a6cafcac64d53d7dddc6616dfbbd771c47ae4192 100644
+--- a/src/gallium/targets/lavapipe/meson.build
++++ b/src/gallium/targets/lavapipe/meson.build
+@@ -1,7 +1,7 @@
+ 
+ 
+ libvulkan_lvp = shared_library(
+-  'vulkan_lvp',
++  'vulkan_lvp_mesa3d',
+   [ 'lavapipe_target.c' ],
+   vs_module_defs : vulkan_api_def,
+   include_directories : [ inc_src, inc_util, inc_include, inc_gallium, inc_gallium_aux, inc_gallium_winsys, inc_gallium_drivers ],
+diff --git a/src/nouveau/nil/meson.build b/src/nouveau/nil/meson.build
+index eee265d6df53856f0c9f6e7a2334b16c669b6634..889c4dd30f98fcfc025fae40c0b3d0a784dd46c7 100644
+--- a/src/nouveau/nil/meson.build
++++ b/src/nouveau/nil/meson.build
+@@ -28,7 +28,7 @@ _libnil_format_table = static_library(
+   'libnil_format_table',
+   _nil_format_table,
+   include_directories : [inc_include, inc_src],
+-  dependencies : [idep_nvidia_headers, idep_mesautil],
++  dependencies : [idep_nvidia_headers],
+   gnu_symbol_visibility: 'hidden',
+ )
+ 

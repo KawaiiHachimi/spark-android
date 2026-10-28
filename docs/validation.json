@@ -1,0 +1,59 @@
+{
+  "mode": "verify-package",
+  "repositories": [
+    {
+      "path": "build/make",
+      "patches": 1,
+      "tree": "498ffee7f7e520dcbc21f8d33d7dcde991354863",
+      "result": "PASS"
+    },
+    {
+      "path": "build/soong",
+      "patches": 1,
+      "tree": "633e93ca60a8e689c5a111ca7f3c360562a2d776",
+      "result": "PASS"
+    },
+    {
+      "path": "device/mainline/generic",
+      "patches": 2,
+      "tree": "9a15d8f815143308e2d022109eb9fd09fd6a21ab",
+      "result": "PASS"
+    },
+    {
+      "path": "external/mesa",
+      "patches": 4,
+      "tree": "e1e4704f56187f6d29b17e7584d7415ad11645c8",
+      "result": "PASS"
+    },
+    {
+      "path": "external/zstd",
+      "patches": 1,
+      "tree": "22ceeff3d7fc621a4feb2eba51dfad611517083e",
+      "result": "PASS"
+    },
+    {
+      "path": "frameworks/native",
+      "patches": 1,
+      "tree": "059bc55c7f9e3f6bb5c4ee128072e2d4fb878c89",
+      "result": "PASS"
+    },
+    {
+      "path": "system/core",
+      "patches": 1,
+      "tree": "6a198cfa535ec7eaac72c561ac33b09c016b9b72",
+      "result": "PASS"
+    },
+    {
+      "path": "system/memory/libmeminfo",
+      "patches": 1,
+      "tree": "e9d33c41d635f2ae6f72b39c8616c90a6beafe3e",
+      "result": "PASS"
+    },
+    {
+      "path": "kernel/mainline/android-mainline",
+      "patches": 4,
+      "tree": "8ae00246378d4dc6377eef660f4520bc5e038d6e",
+      "result": "PASS"
+    }
+  ]
+}

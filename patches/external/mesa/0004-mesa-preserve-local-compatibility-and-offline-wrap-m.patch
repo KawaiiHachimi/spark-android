@@ -1,0 +1,1525 @@
+From 773763de5bd2d5b1e77b451bb85b1cf3e6d3ff16 Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:02:14 +0800
+Subject: [PATCH 4/4] mesa: preserve local compatibility and offline wrap
+ metadata
+
+Keep local Tegra/Freedreno compatibility, feature documentation and pick
+metadata. Preserve URL-stripped wraps and Meson package patches.
+Dependency archives are fetched separately using the patch repository helper.
+
+diff --git a/.pick_status.json b/.pick_status.json
+index 38cdd02e68328fc7385023780226d73e281fb8ed..402e9b286c89c2a0dbc2249937604be59d206506 100644
+--- a/.pick_status.json
++++ b/.pick_status.json
+@@ -7554,7 +7554,7 @@
+         "description": "vulkan/android: undo forcing linear for mutable format",
+         "nominated": true,
+         "nomination_type": 2,
+-        "resolution": 1,
++        "resolution": 0,
+         "main_sha": null,
+         "because_sha": "d02b25157c68804c4e6da613faf0f38a3bcca6d3",
+         "notes": null
+diff --git a/docs/features.txt b/docs/features.txt
+index ada13f68970ee974d572b14649152a5ca5a97ff0..f40dd981e820c5af2e9ae9f2d30ebc34d5f8a593 100644
+--- a/docs/features.txt
++++ b/docs/features.txt
+@@ -632,7 +632,7 @@ Khronos extensions that are not part of any Vulkan version:
+   VK_EXT_device_address_binding_report                  DONE (anv, panvk, radv, tu)
+   VK_EXT_device_fault                                   DONE (radv)
+   VK_EXT_device_generated_commands                      DONE (anv, lvp, nvk/Turing+, radv/gfx8+)
+-  VK_EXT_device_memory_report                           DONE (anv, panvk, pvr, radv, tu, vn)
++  VK_EXT_device_memory_report                           DONE (anv, nvk, panvk, pvr, radv, tu, vn)
+   VK_EXT_direct_mode_display                            DONE (anv, hasvk, hk, kk, lvp, nvk, panvk, pvr, radv, tu, v3dv, vn)
+   VK_EXT_discard_rectangles                             DONE (nvk, radv)
+   VK_EXT_display_control                                DONE (anv, hasvk, nvk, panvk, pvr, radv, tu)
+diff --git a/download_and_verify_wraps.py b/download_and_verify_wraps.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..6202409d18d477ea03c03cfe7809c48db13bc6ba
+--- /dev/null
++++ b/download_and_verify_wraps.py
+@@ -0,0 +1,198 @@
++#!/usr/bin/python3
++
++import os
++import hashlib
++import configparser
++import shutil
++import requests
++import sys
++
++def download_and_verify_wraps(project_root_dir):
++    """
++    Downloads and verifies files defined in .wrap files to the correct path,
++    supporting source_fallback_url and HTTP proxy. Removes source_url and
++    source_fallback_url from the .wrap file upon successful download or
++    successful verification of an already present file.
++
++    Args:
++        project_root_dir (str): The root directory of the Meson project.
++    """
++    print(f"Starting wrap file processing in: {os.path.abspath(project_root_dir)}")
++
++    subprojects_dir = os.path.join(project_root_dir, "subprojects")
++    packagefiles_dir = os.path.join(subprojects_dir, "packagefiles")
++
++    if not os.path.exists(subprojects_dir):
++        print(f"Error: '{subprojects_dir}' not found. Are you in the correct project root?")
++        return
++
++    os.makedirs(packagefiles_dir, exist_ok=True)
++    print(f"Ensured '{packagefiles_dir}' exists.")
++
++    found_wraps = []
++    for root, _, files in os.walk(subprojects_dir):
++        for file in files:
++            if file.endswith(".wrap"):
++                found_wraps.append(os.path.join(root, file))
++
++    if not found_wraps:
++        print("No .wrap files found in subprojects directory.")
++        return
++
++    print(f"Found {len(found_wraps)} .wrap files.")
++
++    # Get proxy settings from environment variables if available
++    proxies = {}
++    if os.environ.get('HTTP_PROXY'):
++        proxies['http'] = os.environ['HTTP_PROXY']
++    if os.environ.get('HTTPS_PROXY'):
++        proxies['https'] = os.environ['HTTPS_PROXY']
++
++    if proxies:
++        print(f"Using proxies: {proxies}")
++    else:
++        print("No HTTP/HTTPS proxy found in environment variables.")
++
++    # Define a User-Agent header
++    # Replace 'your_email@example.com' with a real contact if distributing
++    headers = {
++        'User-Agent': 'MesonWrapDownloader/1.0 (contact: your_email@example.com)'
++    }
++    print(f"Using User-Agent: {headers['User-Agent']}")
++
++    for wrap_file_path in found_wraps:
++        print(f"\nProcessing '{wrap_file_path}'...")
++        # Use 'interpolation=None' to prevent ConfigParser from interpreting special chars
++        config = configparser.ConfigParser(interpolation=None)
++        try:
++            config.read(wrap_file_path, encoding='utf-8')
++        except configparser.Error as e:
++            print(f"  Error reading wrap file '{wrap_file_path}': {e}")
++            continue
++
++        if 'wrap-file' not in config:
++            print(f"  Warning: '{wrap_file_path}' does not contain a '[wrap-file]' section. Skipping.")
++            continue
++
++        wrap_info = config['wrap-file']
++        source_filename = wrap_info.get('source_filename')
++        source_hash = wrap_info.get('source_hash')
++        source_url = wrap_info.get('source_url')
++        source_fallback_url = wrap_info.get('source_fallback_url')
++
++        # Store initial state of URL fields to determine if modification is needed later
++        initial_source_url_present = 'source_url' in wrap_info
++        initial_source_fallback_url_present = 'source_fallback_url' in wrap_info
++
++        if not source_filename:
++            print(f"  Warning: 'source_filename' not found in '[wrap-file]' section of '{wrap_file_path}'. Skipping.")
++            continue
++
++        expected_file_path = os.path.join(packagefiles_dir, source_filename)
++        file_status_ok = False # True if file is present and verified, or successfully downloaded and verified
++
++        if os.path.exists(expected_file_path):
++            print(f"  Found '{source_filename}' at '{expected_file_path}'. Verifying hash...")
++            if source_hash:
++                try:
++                    actual_hash = hashlib.sha256(open(expected_file_path, 'rb').read()).hexdigest()
++                    if actual_hash == source_hash:
++                        print(f"  Hash matches for '{source_filename}'. OK. ✅")
++                        file_status_ok = True
++                    else:
++                        print(f"  ERROR: Hash mismatch for '{source_filename}'. Expected {source_hash}, got {actual_hash}. ❌")
++                        print(f"  File will be re-downloaded (if possible). Deleting corrupted file.")
++                        os.remove(expected_file_path) # Delete corrupted file to force re-download
++                except OSError as e:
++                    print(f"  Error reading file '{expected_file_path}': {e}. Will attempt re-download.")
++            else:
++                print(f"  Warning: No 'source_hash' defined in '{wrap_file_path}'. Cannot verify integrity. Assuming OK. ⚠️")
++                file_status_ok = True # Assume OK if no hash to check
++
++        # Only attempt download if the file is not already present and verified
++        if not file_status_ok:
++            download_urls = []
++            if source_url:
++                download_urls.append(source_url)
++            if source_fallback_url:
++                download_urls.append(source_fallback_url)
++
++            if not download_urls:
++                print(f"  ERROR: No 'source_url' or 'source_fallback_url' found for '{source_filename}'. Cannot download. 🛑")
++                continue
++
++            downloaded_successfully = False
++            for url_to_try in download_urls:
++                print(f"  Attempting to download '{source_filename}' from: {url_to_try}")
++                try:
++                    # Pass the headers dictionary to the requests.get() method
++                    response = requests.get(url_to_try, stream=True, proxies=proxies, headers=headers, timeout=30)
++                    response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
++
++                    with open(expected_file_path, 'wb') as f:
++                        for chunk in response.iter_content(chunk_size=81992): # Increased chunk size for efficiency
++                            f.write(chunk)
++                    print(f"  Successfully downloaded '{source_filename}'.")
++
++                    if source_hash:
++                        actual_hash = hashlib.sha256(open(expected_file_path, 'rb').read()).hexdigest()
++                        if actual_hash == source_hash:
++                            print(f"  Hash matches for '{source_filename}'. OK. ✅")
++                            file_status_ok = True # Set status to OK after successful download and verification
++                            downloaded_successfully = True
++                            break # Break from URL loop, successful download and verify
++                        else:
++                            print(f"  ERROR: Downloaded file hash mismatch for '{source_filename}'. Expected {source_hash}, got {actual_hash}. ❌")
++                            print(f"  Deleting corrupted download. Trying next URL if available.")
++                            os.remove(expected_file_path) # Remove corrupted file
++                    else:
++                        print(f"  Warning: No 'source_hash' defined. Cannot verify integrity. Assuming OK. ⚠️")
++                        file_status_ok = True # Assume OK if no hash
++                        downloaded_successfully = True
++                        break # Break from URL loop, assuming OK
++                except requests.exceptions.RequestException as e:
++                    print(f"  Download or network error from {url_to_try}: {e}. Trying next URL if available.")
++                except OSError as e:
++                    print(f"  File system error writing '{expected_file_path}': {e}.")
++                    break # Critical error, stop trying URLs for this file
++            
++            if not downloaded_successfully and not file_status_ok: # If loop finished and no success
++                print(f"  ERROR: Failed to download '{source_filename}' from any provided URL. 🛑")
++                print("  Please check network, proxy settings, or manually place the file.")
++
++        # --- Post-Processing: Remove URLs if file is now OK ---
++        if file_status_ok:
++            config_modified = False
++            if initial_source_url_present and 'source_url' in config['wrap-file']:
++                del config['wrap-file']['source_url']
++                config_modified = True
++            if initial_source_fallback_url_present and 'source_fallback_url' in config['wrap-file']:
++                del config['wrap-file']['source_fallback_url']
++                config_modified = True
++
++            if config_modified:
++                try:
++                    # Overwrite the original .wrap file with modified content
++                    with open(wrap_file_path, 'w', encoding='utf-8') as f:
++                        config.write(f)
++                    print(f"  Removed 'source_url' and/or 'source_fallback_url' from '{wrap_file_path}'.")
++                except Exception as e:
++                    print(f"  Warning: Could not remove URL entries from '{wrap_file_path}': {e}")
++        # else: (File is not OK, error message already printed above)
++
++    print("\nWrap file processing finished.")
++
++# --- Usage Example ---
++if __name__ == "__main__":
++    # Ensure 'requests' library is installed
++    try:
++        import requests
++    except ImportError:
++        print("The 'requests' library is required for downloading.")
++        print("Please install it using: pip install requests")
++        sys.exit(1)
++
++    # Get Mesa project root path from where the script is executed
++    mesa_project_path = os.getcwd()
++
++    download_and_verify_wraps(project_root_dir=mesa_project_path)
+diff --git a/src/freedreno/common/freedreno_devices.py b/src/freedreno/common/freedreno_devices.py
+index 47791d645d4d2cedaf7919a0f4bf4820ac718c74..bdc1b496ca71c7dd1568acf7ece62be40d9bf703 100644
+--- a/src/freedreno/common/freedreno_devices.py
++++ b/src/freedreno/common/freedreno_devices.py
+@@ -992,6 +992,25 @@ a740_raw_magic_regs = [
+         [A6XXRegs.REG_A6XX_UCHE_UNKNOWN_0E12, 0],
+     ]
+ 
++add_gpus([
++        GPUId(chip_id=0x43020100, name="Adreno (TM) 722"),
++        GPUId(chip_id=0xffff43020100, name="Adreno (TM) 722"),
++    ], A6xxGPUInfo(
++        CHIP.A7XX,
++        [a7xx_base, a7xx_gen1],
++        num_ccu = 1,
++        tile_align_w = 64,
++        tile_align_h = 16,
++        tile_max_w = 1024,
++        tile_max_h = 1024,
++        num_vsc_pipes = 32,
++        cs_shared_mem_size = 32 * 1024,
++        wave_granularity = 2,
++        fibers_per_sp = 128 * 2 * 16,
++        magic_regs = a730_magic_regs,
++        raw_magic_regs = a730_raw_magic_regs,
++    ))
++
+ add_gpus([
+         # These are named as Adreno730v3 or Adreno725v1.
+         GPUId(chip_id=0x07030002, name="FD725"),
+@@ -1382,6 +1401,7 @@ add_gpus([
+ 
+ add_gpus([
+         GPUId(chip_id=0xffff44050000, name="Adreno (TM) 830"),
++        GPUId(chip_id=0xffff44050001, name="Adreno (TM) 830v1"),
+         GPUId(chip_id=0x44050001, name="Adreno (TM) 830"), # KGSL
+     ], A6xxGPUInfo(
+         CHIP.A8XX,
+diff --git a/src/gallium/drivers/tegra/tegra_context.c b/src/gallium/drivers/tegra/tegra_context.c
+index fb800f354024f51f43c66fe6f9707f041675f991..a5acb87f79842243aa362d346ff804a2d690eac5 100644
+--- a/src/gallium/drivers/tegra/tegra_context.c
++++ b/src/gallium/drivers/tegra/tegra_context.c
+@@ -163,7 +163,8 @@ tegra_get_query_result_resource(struct pipe_context *pcontext,
+    struct tegra_context *context = to_tegra_context(pcontext);
+ 
+    context->gpu->get_query_result_resource(context->gpu, query, flags,
+-                                           result_type, index, resource,
++                                           result_type, index,
++                                           tegra_resource_unwrap(resource),
+                                            offset);
+ }
+ 
+@@ -496,8 +497,16 @@ tegra_set_framebuffer_state(struct pipe_context *pcontext,
+                             const struct pipe_framebuffer_state *fb)
+ {
+    struct tegra_context *context = to_tegra_context(pcontext);
++   struct pipe_framebuffer_state state = *fb;
++   unsigned int i;
+ 
+-   context->gpu->set_framebuffer_state(context->gpu, fb);
++   for (i = 0; i < fb->nr_cbufs; i++)
++      state.cbufs[i].texture = tegra_resource_unwrap(fb->cbufs[i].texture);
++
++   state.zsbuf.texture = tegra_resource_unwrap(fb->zsbuf.texture);
++   state.resolve = tegra_resource_unwrap(fb->resolve);
++
++   context->gpu->set_framebuffer_state(context->gpu, &state);
+ }
+ 
+ static void
+@@ -599,6 +608,16 @@ tegra_set_shader_buffers(struct pipe_context *pcontext, mesa_shader_stage shader
+                          unsigned writable_bitmask)
+ {
+    struct tegra_context *context = to_tegra_context(pcontext);
++   struct pipe_shader_buffer buf[PIPE_MAX_SHADER_BUFFERS];
++
++   if (buffers) {
++      memcpy(buf, buffers, count * sizeof(*buf));
++
++      for (unsigned i = 0; i < count; i++)
++         buf[i].buffer = tegra_resource_unwrap(buf[i].buffer);
++
++      buffers = buf;
++   }
+ 
+    context->gpu->set_shader_buffers(context->gpu, shader, start, count,
+                                     buffers, writable_bitmask);
+@@ -611,6 +630,16 @@ tegra_set_shader_images(struct pipe_context *pcontext, mesa_shader_stage shader,
+                         const struct pipe_image_view *images)
+ {
+    struct tegra_context *context = to_tegra_context(pcontext);
++   struct pipe_image_view img[PIPE_MAX_SHADER_IMAGES];
++
++   if (images) {
++      memcpy(img, images, count * sizeof(*img));
++
++      for (unsigned i = 0; i < count; i++)
++         img[i].resource = tegra_resource_unwrap(img[i].resource);
++
++      images = img;
++   }
+ 
+    context->gpu->set_shader_images(context->gpu, shader, start, count,
+                                    unbind_num_trailing_slots, images);
+@@ -735,9 +764,11 @@ tegra_clear_render_target(struct pipe_context *pcontext,
+                           bool render_condition)
+ {
+    struct tegra_context *context = to_tegra_context(pcontext);
+-   struct tegra_surface *dst = to_tegra_surface(pdst);
++   struct pipe_surface dst = *pdst;
+ 
+-   context->gpu->clear_render_target(context->gpu, dst->gpu, color, dstx,
++   dst.texture = tegra_resource_unwrap(pdst->texture);
++
++   context->gpu->clear_render_target(context->gpu, &dst, color, dstx,
+                                      dsty, width, height, render_condition);
+ }
+ 
+@@ -754,9 +785,11 @@ tegra_clear_depth_stencil(struct pipe_context *pcontext,
+                           bool render_condition)
+ {
+    struct tegra_context *context = to_tegra_context(pcontext);
+-   struct tegra_surface *dst = to_tegra_surface(pdst);
++   struct pipe_surface dst = *pdst;
++
++   dst.texture = tegra_resource_unwrap(pdst->texture);
+ 
+-   context->gpu->clear_depth_stencil(context->gpu, dst->gpu, flags, depth,
++   context->gpu->clear_depth_stencil(context->gpu, &dst, flags, depth,
+                                      stencil, dstx, dsty, width, height,
+                                      render_condition);
+ }
+@@ -1032,10 +1065,13 @@ tegra_launch_grid(struct pipe_context *pcontext,
+                   const struct pipe_grid_info *info)
+ {
+    struct tegra_context *context = to_tegra_context(pcontext);
++   struct pipe_grid_info grid = *info;
+ 
+-   /* XXX unwrap info->indirect? */
++   /* XXX unwrap grid.globals, only ever set by the OpenCL frontend */
++   grid.indirect = tegra_resource_unwrap(info->indirect);
++   grid.indirect_draw_count = tegra_resource_unwrap(info->indirect_draw_count);
+ 
+-   context->gpu->launch_grid(context->gpu, info);
++   context->gpu->launch_grid(context->gpu, &grid);
+ }
+ 
+ static void
+@@ -1134,7 +1170,9 @@ tegra_create_texture_handle(struct pipe_context *pcontext,
+ {
+    struct tegra_context *context = to_tegra_context(pcontext);
+ 
+-   return context->gpu->create_texture_handle(context->gpu, view, state);
++   return context->gpu->create_texture_handle(context->gpu,
++                                              tegra_sampler_view_unwrap(view),
++                                              state);
+ }
+ 
+ static void tegra_delete_texture_handle(struct pipe_context *pcontext,
+@@ -1157,8 +1195,11 @@ static uint64_t tegra_create_image_handle(struct pipe_context *pcontext,
+                                           const struct pipe_image_view *image)
+ {
+    struct tegra_context *context = to_tegra_context(pcontext);
++   struct pipe_image_view img = *image;
++
++   img.resource = tegra_resource_unwrap(image->resource);
+ 
+-   return context->gpu->create_image_handle(context->gpu, image);
++   return context->gpu->create_image_handle(context->gpu, &img);
+ }
+ 
+ static void tegra_delete_image_handle(struct pipe_context *pcontext,
+diff --git a/src/gallium/drivers/tegra/tegra_resource.h b/src/gallium/drivers/tegra/tegra_resource.h
+index 892afaf5e0fa1feef2556ba61c6ae9da97863d99..2d54150ac97ff3bb1bdff06b720563c44d63fde1 100644
+--- a/src/gallium/drivers/tegra/tegra_resource.h
++++ b/src/gallium/drivers/tegra/tegra_resource.h
+@@ -54,24 +54,4 @@ tegra_resource_unwrap(struct pipe_resource *resource)
+    return to_tegra_resource(resource)->gpu;
+ }
+ 
+-struct tegra_surface {
+-   struct pipe_surface base;
+-   struct pipe_surface *gpu;
+-};
+-
+-static inline struct tegra_surface *
+-to_tegra_surface(struct pipe_surface *surface)
+-{
+-   return (struct tegra_surface *)surface;
+-}
+-
+-static inline struct pipe_surface *
+-tegra_surface_unwrap(struct pipe_surface *surface)
+-{
+-   if (!surface)
+-      return NULL;
+-
+-   return to_tegra_surface(surface)->gpu;
+-}
+-
+ #endif /* TEGRA_RESOURCE_H */
+diff --git a/subprojects/.gitignore b/subprojects/.gitignore
+index 6ccac5a2babb4e2481738a06a4d4f73e68a1eb92..425e368b389fa97f925301dec8e74f2d176f1ded 100644
+--- a/subprojects/.gitignore
++++ b/subprojects/.gitignore
+@@ -1,4 +1,3 @@
+-*
+ !*.wrap
+ !packagefiles/**
+ !.gitignore
+diff --git a/subprojects/Vulkan-Profiles.wrap b/subprojects/Vulkan-Profiles.wrap
+index 1d2e8dd48275c126ac2acdd7ee93125e12299904..db9700cbb46f1896f8876d2379a88ca2160b950b 100644
+--- a/subprojects/Vulkan-Profiles.wrap
++++ b/subprojects/Vulkan-Profiles.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = Vulkan-Profiles-a1e185fb5035f9726d16a869a2f11067dd21aa10
+-source_url = https://github.com/KhronosGroup/Vulkan-Profiles/archive/a1e185fb5035f9726d16a869a2f11067dd21aa10.zip
+ source_filename = Vulkan-Profiles-a1e185fb50.zip
+ source_hash = 775b0faebd53e3f31f1771d7ca9f8d899778ce596177fb9edd8d26d5323f854a
+ patch_directory = Vulkan-Profiles
++
+diff --git a/subprojects/bitflags-2-rs.wrap b/subprojects/bitflags-2-rs.wrap
+index e3b3083760695c7c808eb8395fbe979a185352f7..94c169341f826e57aeb1d884552a1c2258fdb702 100644
+--- a/subprojects/bitflags-2-rs.wrap
++++ b/subprojects/bitflags-2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = bitflags-2.9.1
+-source_url = https://static.crates.io/crates/bitflags/2.9.1/download
+ source_filename = bitflags-2.9.1.tar.gz
+ source_hash = 1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967
+ patch_directory = bitflags-2-rs
++
+diff --git a/subprojects/cfg-if-1-rs.wrap b/subprojects/cfg-if-1-rs.wrap
+index 1e09d4ad687a260ac63d7375a342343c9c6dbd4b..e0ec2e4fc0edb175d714ca65f15661c5422be948 100644
+--- a/subprojects/cfg-if-1-rs.wrap
++++ b/subprojects/cfg-if-1-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = cfg-if-1.0.0
+-source_url = https://static.crates.io/crates/cfg-if/1.0.0/download
+ source_filename = cfg-if-1.0.0.tar.gz
+ source_hash = baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd
+ patch_directory = cfg-if-1-rs
++
+diff --git a/subprojects/equivalent-1-rs.wrap b/subprojects/equivalent-1-rs.wrap
+index 088ebbbad75e3a898baa8a3e0173ee88146a32cd..33f7bfbfc2a9f332606be2c78399139e01488747 100644
+--- a/subprojects/equivalent-1-rs.wrap
++++ b/subprojects/equivalent-1-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = equivalent-1.0.1
+-source_url = https://static.crates.io/crates/equivalent/1.0.1/download
+ source_filename = equivalent-1.0.1.tar.gz
+ source_hash = 5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5
+ patch_directory = equivalent-1-rs
++
+diff --git a/subprojects/errno-0.3-rs.wrap b/subprojects/errno-0.3-rs.wrap
+index d6893dc278ef67ea769e3e0d89017c6b95b1eaff..e0cfab928e228eedaec6b2c85502f93963c5ea5b 100644
+--- a/subprojects/errno-0.3-rs.wrap
++++ b/subprojects/errno-0.3-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = errno-0.3.12
+-source_url = https://static.crates.io/crates/errno/0.3.12/download
+ source_filename = errno-0.3.12.tar.gz
+ source_hash = cea14ef9355e3beab063703aa9dab15afd25f0667c341310c1e5274bb1d0da18
+ patch_directory = errno-0.3-rs
++
+diff --git a/subprojects/expat.wrap b/subprojects/expat.wrap
+index bda901160f99d4a13ca5f8c43a2afae23044de93..d1fd00b658189e7d11624d32ee601999d5283a30 100644
+--- a/subprojects/expat.wrap
++++ b/subprojects/expat.wrap
+@@ -1,13 +1,12 @@
+ [wrap-file]
+ directory = expat-2.5.0
+-source_url = https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.xz
+ source_filename = expat-2.5.0.tar.bz2
+ source_hash = ef2420f0232c087801abf705e89ae65f6257df6b7931d37846a193ef2e8cdcbe
+ patch_filename = expat_2.5.0-3_patch.zip
+ patch_url = https://wrapdb.mesonbuild.com/v2/expat_2.5.0-3/get_patch
+ patch_hash = e30c8c32f79fd4563a86a5c9cfe419568c35b775077c2d1428170081129406b4
+-source_fallback_url = https://github.com/mesonbuild/wrapdb/releases/download/expat_2.5.0-3/expat-2.5.0.tar.bz2
+ wrapdb_version = 2.5.0-3
+ 
+ [provide]
+ expat = expat_dep
++
+diff --git a/subprojects/hashbrown-0.14-rs.wrap b/subprojects/hashbrown-0.14-rs.wrap
+index b0399f2e6e426de0ec16737c20dc863fdcb9f707..ddb5b1c69394cc7b3c3f80027d1d44b23ad9134f 100644
+--- a/subprojects/hashbrown-0.14-rs.wrap
++++ b/subprojects/hashbrown-0.14-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = hashbrown-0.14.1
+-source_url = https://static.crates.io/crates/hashbrown/0.14.1/download
+ source_filename = hashbrown-0.14.1.tar.gz
+ source_hash = 7dfda62a12f55daeae5015f81b0baea145391cb4520f86c248fc615d72640d12
+ patch_directory = hashbrown-0.14-rs
++
+diff --git a/subprojects/indexmap-2-rs.wrap b/subprojects/indexmap-2-rs.wrap
+index 23aee1fd1fb52cb50f20820a723f80308269bcc6..48a2cb747a7b38f9875c27368974af8c77f233f2 100644
+--- a/subprojects/indexmap-2-rs.wrap
++++ b/subprojects/indexmap-2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = indexmap-2.2.6
+-source_url = https://static.crates.io/crates/indexmap/2.2.6/download
+ source_filename = indexmap-2.2.6.tar.gz
+ source_hash = 168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26
+ patch_directory = indexmap-2-rs
++
+diff --git a/subprojects/libarchive.wrap b/subprojects/libarchive.wrap
+index 4461fc1a931bb812aad3ca449f9bcbb99b19a129..2566e8a22bf021588294587d0002ff23995a5ea5 100644
+--- a/subprojects/libarchive.wrap
++++ b/subprojects/libarchive.wrap
+@@ -1,13 +1,12 @@
+ [wrap-file]
+ directory = libarchive-3.7.2
+-source_url = https://github.com/libarchive/libarchive/releases/download/v3.7.2/libarchive-3.7.2.tar.xz
+ source_filename = libarchive-3.7.2.tar.xz
+ source_hash = 04357661e6717b6941682cde02ad741ae4819c67a260593dfb2431861b251acb
+ patch_filename = libarchive_3.7.2-3_patch.zip
+ patch_url = https://wrapdb.mesonbuild.com/v2/libarchive_3.7.2-3/get_patch
+ patch_hash = 1cec0d1d80257ed4b18bea0d7f1aef9f02f5b6a80e269eee7457ece32f53f5ca
+-source_fallback_url = https://github.com/mesonbuild/wrapdb/releases/download/libarchive_3.7.2-3/libarchive-3.7.2.tar.xz
+ wrapdb_version = 3.7.2-3
+ 
+ [provide]
+ libarchive = libarchive_dep
++
+diff --git a/subprojects/libc-0.2-rs.wrap b/subprojects/libc-0.2-rs.wrap
+index 0ccb482f95eda696f7451cd2413b31f9232b67b5..8c491fa34fbffd49a88419e933ccd76261930a32 100644
+--- a/subprojects/libc-0.2-rs.wrap
++++ b/subprojects/libc-0.2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = libc-0.2.185
+-source_url = https://static.crates.io/crates/libc/0.2.185/download
+ source_filename = libc-0.2.185.tar.gz
+ source_hash = 52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f
+ patch_directory = libc-0.2-rs
++
+diff --git a/subprojects/libdrm.wrap b/subprojects/libdrm.wrap
+index b09a8952f85c7b7dce3f8f09f6ac41b5a9e716db..20cfb337c4c48442f6d02de6d409d228bc376713 100644
+--- a/subprojects/libdrm.wrap
++++ b/subprojects/libdrm.wrap
+@@ -1,10 +1,9 @@
+ [wrap-file]
+ directory = libdrm-2.4.133
+-source_url = https://dri.freedesktop.org/libdrm/libdrm-2.4.133.tar.xz
+ source_filename = libdrm-2.4.133.tar.xz
+ source_hash = fc68f9d0ba2ea63c9432a299e14fea09fad7a8a66e8039fcd7802ca59f77b4f5
+-source_fallback_url = https://wrapdb.mesonbuild.com/v2/libdrm_2.4.133-1/get_source/libdrm-2.4.133.tar.xz
+ wrapdb_version = 2.4.133-1
+ 
+ [provide]
+ dependency_names = libdrm, libdrm_amdgpu, libdrm_etnaviv, libdrm_exynos, libdrm_freedreno, libdrm_intel, libdrm_nouveau, libdrm_omap, libdrm_radeon, libdrm_tegra
++
+diff --git a/subprojects/libva.wrap b/subprojects/libva.wrap
+index ee64d09e3409ffbaa34b621ef20d424776d9e4be..0fbfe858ec955f218148028512282d27eca260fc 100644
+--- a/subprojects/libva.wrap
++++ b/subprojects/libva.wrap
+@@ -1,8 +1,8 @@
+ [wrap-file]
+ directory = libva-2.22.0
+-source_url = https://github.com/intel/libva/archive/refs/tags/2.22.0.tar.gz
+ source_filename = 2.22.0.tar.gz
+ source_hash = 467c418c2640a178c6baad5be2e00d569842123763b80507721ab87eb7af8735
+ 
+ [provide]
+-libva = libva_dep
+\ No newline at end of file
++libva = libva_dep
++
+diff --git a/subprojects/libxml2.wrap b/subprojects/libxml2.wrap
+index 373a4b543bb1a0bc8985a78da65de710872ea6e7..288f9289975915f8b835fb7f10b00e33b38ddaba 100644
+--- a/subprojects/libxml2.wrap
++++ b/subprojects/libxml2.wrap
+@@ -1,7 +1,5 @@
+ [wrap-file]
+ directory = libxml2-2.11.6
+-source_url = https://download.gnome.org/sources/libxml2/2.11/libxml2-2.11.6.tar.xz
+-source_fallback_url = https://github.com/mesonbuild/wrapdb/releases/download/libxml2_2.11.6-1/libxml2-2.11.6.tar.xz
+ source_filename = libxml2-2.11.6.tar.xz
+ source_hash = c90eee7506764abbe07bb616b82da452529609815aefef423d66ef080eb0c300
+ patch_filename = libxml2_2.11.6-1_patch.zip
+@@ -11,3 +9,4 @@ wrapdb_version = 2.11.6-1
+ 
+ [provide]
+ libxml-2.0 = libxml2_dep
++
+diff --git a/subprojects/log-0.4-rs.wrap b/subprojects/log-0.4-rs.wrap
+index 10f6616a3d6f291d0cd8c09fb8d05abdcd4bcf7d..50b3bd4f5ffa9e5643d23ccd27f27378d220fde1 100644
+--- a/subprojects/log-0.4-rs.wrap
++++ b/subprojects/log-0.4-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = log-0.4.27
+-source_url = https://static.crates.io/crates/log/0.4.27/download
+ source_filename = log-0.4.27.tar.gz
+ source_hash = 13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94
+ patch_directory = log-0.4-rs
++
+diff --git a/subprojects/lua.wrap b/subprojects/lua.wrap
+index a1ffdaf3463cd33b398f56a27348638a4e649016..e5905a0c24234463dbac12898cb43de69ba7ac9d 100644
+--- a/subprojects/lua.wrap
++++ b/subprojects/lua.wrap
+@@ -1,14 +1,13 @@
+ [wrap-file]
+ directory = lua-5.4.6
+-source_url = https://www.lua.org/ftp/lua-5.4.6.tar.gz
+ source_filename = lua-5.4.6.tar.gz
+ source_hash = 7d5ea1b9cb6aa0b59ca3dde1c6adcb57ef83a1ba8e5432c0ecd06bf439b3ad88
+ patch_filename = lua_5.4.6-4_patch.zip
+ patch_url = https://wrapdb.mesonbuild.com/v2/lua_5.4.6-4/get_patch
+ patch_hash = b5a8c9b3673fbe58afaf842041bc9551f1f742c363fd3be8d47db2e6a483b54c
+-source_fallback_url = https://github.com/mesonbuild/wrapdb/releases/download/lua_5.4.6-4/lua-5.4.6.tar.gz
+ wrapdb_version = 5.4.6-4
+ 
+ [provide]
+ lua-5.4 = lua_dep
+ lua = lua_dep
++
+diff --git a/subprojects/once_cell-1-rs.wrap b/subprojects/once_cell-1-rs.wrap
+index 50fc5e617c040e91a2809c7a173026fea444ee86..75bbd0f44b329433bf6391fe8bf52088e750fb6e 100644
+--- a/subprojects/once_cell-1-rs.wrap
++++ b/subprojects/once_cell-1-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = once_cell-1.8.0
+-source_url = https://static.crates.io/crates/once_cell/1.8.0/download
+ source_filename = once_cell-1.8.0.tar.gz
+ source_hash = 692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56
+ patch_directory = once_cell-1-rs
++
+diff --git a/subprojects/packagefiles/perfetto-sdk/meson.build b/subprojects/packagefiles/perfetto-sdk/meson.build
+new file mode 100644
+index 0000000000000000000000000000000000000000..b4652408f14db78e43adad35df01cdad346dec90
+--- /dev/null
++++ b/subprojects/packagefiles/perfetto-sdk/meson.build
+@@ -0,0 +1,28 @@
++project(
++    'perfetto-sdk',
++    ['cpp'],
++)
++
++cpp = meson.get_compiler('cpp')
++
++deps_perfetto = [dependency('threads')]
++
++if host_machine.system() == 'android'
++  deps_perfetto += cpp.find_library('log')
++endif
++
++lib_perfetto = static_library(
++    'perfetto',
++    sources: 'perfetto.cc',
++    dependencies: deps_perfetto,
++    install: false,
++    override_options : ['cpp_std=c++17']
++)
++
++inc_perfetto = include_directories('.')
++
++dep_perfetto_sdk = declare_dependency(
++    link_with: lib_perfetto,
++    include_directories: inc_perfetto,
++    dependencies: deps_perfetto,
++)
+diff --git a/subprojects/packagefiles/rustix-1-rs/0001-rustix-add-ioctl-wrappers.patch b/subprojects/packagefiles/rustix-1-rs/0001-rustix-add-ioctl-wrappers.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..faa76f1f7e689b3d19ac3ecedae1a23bb7618d28
+--- /dev/null
++++ b/subprojects/packagefiles/rustix-1-rs/0001-rustix-add-ioctl-wrappers.patch
+@@ -0,0 +1,59 @@
++From eec94e8888578c4f28607c2d5ef4e2f41480b802 Mon Sep 17 00:00:00 2001
++From: Gurchetan Singh <gurchetan.singh.foss@gmail.com>
++Date: Thu, 30 Jan 2025 13:38:39 -0800
++Subject: [PATCH 1/4] rustix: add ioctl wrappers
++
++These ioctl wrappers are used by rustix users.  For example:
++
++https://github.com/Smithay/drm-rs/blob/develop/drm-ffi/src/ioctl.rs#L6
++
++Roughly, they match the ones provided by nix.  I'm upstreaming the
++portion I have personally tested.
++---
++ src/ioctl/mod.rs | 30 ++++++++++++++++++++++++++++++
++ 1 file changed, 30 insertions(+)
++
++diff --git a/src/ioctl/mod.rs b/src/ioctl/mod.rs
++index 70c69053..b6d8fe42 100644
++--- a/src/ioctl/mod.rs
+++++ b/src/ioctl/mod.rs
++@@ -344,6 +344,36 @@ type _Opcode = c::c_uint;
++ #[cfg(windows)]
++ type _Opcode = i32;
++ 
+++/// Convenience macro for Rustix's ioctl write
+++#[macro_export]
+++macro_rules! ioctl_write_ptr {
+++    ($name:ident, $ioty:expr, $nr:expr, $ty:ty) => {
+++        pub unsafe fn $name(fd: std::os::fd::BorrowedFd, data: &$ty) -> std::io::Result<()> {
+++            const OPCODE: $crate::ioctl::Opcode =
+++                $crate::ioctl::opcode::write::<$ty>($ioty as u8, $nr as u8);
+++            Ok(rustix::ioctl::ioctl(
+++                fd,
+++                $crate::ioctl::Setter::<OPCODE, $ty>::new(*data),
+++            )?)
+++        }
+++    };
+++}
+++
+++/// Convenience macro for Rustix's ioctl read
+++#[macro_export]
+++macro_rules! ioctl_readwrite {
+++    ($name:ident, $ioty:expr, $nr:expr, $ty:ty) => {
+++        pub unsafe fn $name(fd: std::os::fd::BorrowedFd, data: &mut $ty) -> std::io::Result<()> {
+++            const OPCODE: $crate::ioctl::Opcode =
+++                $crate::ioctl::opcode::read_write::<$ty>($ioty as u8, $nr as u8);
+++            Ok($crate::ioctl::ioctl(
+++                fd,
+++                $crate::ioctl::Updater::<OPCODE, $ty>::new(data),
+++            )?)
+++        }
+++    };
+++}
+++
++ #[cfg(linux_raw_dep)]
++ #[cfg(not(any(target_arch = "sparc", target_arch = "sparc64")))]
++ #[cfg(test)]
++-- 
++2.54.0.545.g6539524ca2-goog
++
+diff --git a/subprojects/packagefiles/rustix-1-rs/0002-rustix-improve-for-musl-build-without-linux-raw-sys.patch b/subprojects/packagefiles/rustix-1-rs/0002-rustix-improve-for-musl-build-without-linux-raw-sys.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..8b4d2a6b432a117c7f54d85ca488f4c9062c4348
+--- /dev/null
++++ b/subprojects/packagefiles/rustix-1-rs/0002-rustix-improve-for-musl-build-without-linux-raw-sys.patch
+@@ -0,0 +1,85 @@
++From 50c2d9e76170080ac1ab87672771ea65b9b33bcb Mon Sep 17 00:00:00 2001
++From: Gurchetan Singh <gurchetan.singh.foss@gmail.com>
++Date: Mon, 30 Jun 2025 11:24:05 -0700
++Subject: [PATCH 2/4] rustix: improve for musl build without linux-raw-sys
++
++Android likes to build host tools (adb, Cuttlefish, ..)
++via musl, using the same hermetic tree as for Bionic
++build.
++
++And linux-raw-sys isn't in that hermetic tree, so add support
++for the libc-backend.
++---
++ src/backend/libc/fs/syscalls.rs |  4 ++--
++ src/fs/statx.rs                 | 34 +++++++++++++++++++++++++++++++++
++ 2 files changed, 36 insertions(+), 2 deletions(-)
++
++diff --git a/src/backend/libc/fs/syscalls.rs b/src/backend/libc/fs/syscalls.rs
++index 71bc8b0a..1c687cc3 100644
++--- a/src/backend/libc/fs/syscalls.rs
+++++ b/src/backend/libc/fs/syscalls.rs
++@@ -2071,10 +2071,10 @@ pub(crate) fn statx(
++     // doesn't represent all the known flags.
++     //
++     // [it's deprecated]: https://patchwork.kernel.org/project/linux-fsdevel/patch/20200505095915.11275-7-mszeredi@redhat.com/
++-    #[cfg(any(not(linux_raw_dep), not(target_env = "musl")))]
+++    #[cfg(not(target_env = "musl"))]
++     const STATX__RESERVED: u32 = c::STATX__RESERVED as u32;
++     #[cfg(target_env = "musl")]
++-    const STATX__RESERVED: u32 = linux_raw_sys::general::STATX__RESERVED;
+++    const STATX__RESERVED: u32 = 0x80000000;
++     if (mask.bits() & STATX__RESERVED) == STATX__RESERVED {
++         return Err(io::Errno::INVAL);
++     }
++diff --git a/src/fs/statx.rs b/src/fs/statx.rs
++index f8be29f7..e85d63aa 100644
++--- a/src/fs/statx.rs
+++++ b/src/fs/statx.rs
++@@ -3,6 +3,7 @@
++ use crate::fd::AsFd;
++ use crate::fs::AtFlags;
++ use crate::{backend, io, path};
+++#[cfg(any(linux_raw_dep, not(target_env = "musl")))]
++ use backend::c;
++ use bitflags::bitflags;
++ 
++@@ -275,3 +276,36 @@ mod compat {
++         }
++     }
++ }
+++
+++// These are the actual values for the constants, needed for the fallback implementation.
+++// TODO(https://github.com/bytecodealliance/rustix/issues/1589): try to upstream these
+++// constants to libc.
+++#[cfg(all(not(linux_raw_dep), target_env = "musl"))]
+++mod c {
+++    pub const STATX_TYPE: u32 = 0x00000001;
+++    pub const STATX_MODE: u32 = 0x00000002;
+++    pub const STATX_NLINK: u32 = 0x00000004;
+++    pub const STATX_UID: u32 = 0x00000008;
+++    pub const STATX_GID: u32 = 0x00000010;
+++    pub const STATX_ATIME: u32 = 0x00000020;
+++    pub const STATX_MTIME: u32 = 0x00000040;
+++    pub const STATX_CTIME: u32 = 0x00000080;
+++    pub const STATX_INO: u32 = 0x00000100;
+++    pub const STATX_SIZE: u32 = 0x00000200;
+++    pub const STATX_BLOCKS: u32 = 0x00000400;
+++    pub const STATX_BASIC_STATS: u32 = 0x000007ff;
+++    pub const STATX_BTIME: u32 = 0x00000800;
+++    pub const STATX_MNT_ID: u32 = 0x00001000;
+++    pub const STATX_DIOALIGN: u32 = 0x00002000; // Deprecated, but here for completeness
+++    pub const STATX_ALL: u32 = 0x00000fff; // Note: Doesn't include newer flags
+++
+++    pub const STATX_ATTR_COMPRESSED: u64 = 0x00000004;
+++    pub const STATX_ATTR_IMMUTABLE: u64 = 0x00000010;
+++    pub const STATX_ATTR_APPEND: u64 = 0x00000020;
+++    pub const STATX_ATTR_NODUMP: u64 = 0x00000040;
+++    pub const STATX_ATTR_ENCRYPTED: u64 = 0x00000800;
+++    pub const STATX_ATTR_AUTOMOUNT: u64 = 0x00001000;
+++    pub const STATX_ATTR_MOUNT_ROOT: u64 = 0x00020000;
+++    pub const STATX_ATTR_VERITY: u64 = 0x00100000;
+++    pub const STATX_ATTR_DAX: u64 = 0x00200000;
+++}
++-- 
++2.54.0.545.g6539524ca2-goog
++
+diff --git a/subprojects/packagefiles/rustix-1-rs/0003-rustix-enable-rustix-thread-futex-without-linux-raw-.patch b/subprojects/packagefiles/rustix-1-rs/0003-rustix-enable-rustix-thread-futex-without-linux-raw-.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..6b5e1ad6cfc722403945222a15315a8adbf98571
+--- /dev/null
++++ b/subprojects/packagefiles/rustix-1-rs/0003-rustix-enable-rustix-thread-futex-without-linux-raw-.patch
+@@ -0,0 +1,253 @@
++From 680162aec19d93309123aeb9a983d361bdeeb38f Mon Sep 17 00:00:00 2001
++From: Gurchetan Singh <gurchetan.singh.foss@gmail.com>
++Date: Fri, 30 Jan 2026 07:41:51 -0800
++Subject: [PATCH 3/4] rustix: enable rustix::thread::futex without
++ linux-raw-sys
++
++It's desirable to enable futex for some cases that will be
++run on Android.  The strategy is just to define the constants
++needed by the libc ourselves, if libc doesn't provide the
++necessary constant.  Long-term, that could make the libc
++backend only depend on libc.
++---
++ src/backend/libc/c.rs               | 10 +++++++++
++ src/backend/libc/thread/futex.rs    | 31 +++++++++++++++++-----------
++ src/backend/libc/thread/syscalls.rs | 32 +++++++++++++++++++++++++----
++ src/test_macro.rs                   |  3 +++
++ src/thread/mod.rs                   | 11 +++++-----
++ 5 files changed, 66 insertions(+), 21 deletions(-)
++ create mode 100644 src/test_macro.rs
++
++diff --git a/src/backend/libc/c.rs b/src/backend/libc/c.rs
++index 5eeff953..1a319a0f 100644
++--- a/src/backend/libc/c.rs
+++++ b/src/backend/libc/c.rs
++@@ -515,6 +515,16 @@ pub(crate) use statx_flags::*;
++ #[cfg(target_os = "android")]
++ pub(crate) use __fsid_t as fsid_t;
++ 
+++// Android's libc crate is missing some constants.
+++// TODO(https://github.com/bytecodealliance/rustix/issues/1589): try to upstream these
+++// constants to libc.
+++#[cfg(target_os = "android")]
+++pub(crate) const CLONE_NEWTIME: c_int = 0x00000080;
+++#[cfg(target_os = "android")]
+++pub(crate) const FUTEX_WAITERS: u32 = 0x80000000;
+++#[cfg(target_os = "android")]
+++pub(crate) const FUTEX_OWNER_DIED: u32 = 0x40000000;
+++
++ // FreeBSD added `timerfd_*` in FreeBSD 14. NetBSD added then in NetBSD 10.
++ #[cfg(all(feature = "time", any(target_os = "freebsd", target_os = "netbsd")))]
++ syscall!(pub(crate) fn timerfd_create(
++diff --git a/src/backend/libc/thread/futex.rs b/src/backend/libc/thread/futex.rs
++index 5e836a9a..6d2e1495 100644
++--- a/src/backend/libc/thread/futex.rs
+++++ b/src/backend/libc/thread/futex.rs
++@@ -17,6 +17,16 @@ bitflags::bitflags! {
++     }
++ }
++ 
+++// TODO(https://github.com/bytecodealliance/rustix/issues/1589): try to upstream these
+++// constants to libc.
+++const FUTEX2_SIZE_U8: u32 = 0;
+++const FUTEX2_SIZE_U16: u32 = 1;
+++const FUTEX2_SIZE_U32: u32 = 2;
+++const FUTEX2_SIZE_U64: u32 = 3;
+++const FUTEX2_SIZE_MASK: u32 = 3;
+++const FUTEX2_NUMA: u32 = 4;
+++const FUTEX2_PRIVATE: u32 = 128;
+++
++ bitflags::bitflags! {
++     /// `FUTEX2_*` flags for use with the functions in [`Waitv`].
++     ///
++@@ -29,22 +39,19 @@ bitflags::bitflags! {
++     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
++     pub struct WaitFlags: u32 {
++         /// `FUTEX_U8`
++-        const SIZE_U8 = linux_raw_sys::general::FUTEX2_SIZE_U8;
+++        const SIZE_U8 = FUTEX2_SIZE_U8;
++         /// `FUTEX_U16`
++-        const SIZE_U16 = linux_raw_sys::general::FUTEX2_SIZE_U16;
+++        const SIZE_U16 = FUTEX2_SIZE_U16;
++         /// `FUTEX_U32`
++-        const SIZE_U32 = linux_raw_sys::general::FUTEX2_SIZE_U32;
+++        const SIZE_U32 = FUTEX2_SIZE_U32;
++         /// `FUTEX_U64`
++-        const SIZE_U64 = linux_raw_sys::general::FUTEX2_SIZE_U64;
+++        const SIZE_U64 = FUTEX2_SIZE_U64;
++         /// `FUTEX_SIZE_MASK`
++-        const SIZE_MASK = linux_raw_sys::general::FUTEX2_SIZE_MASK;
++-
+++        const SIZE_MASK = FUTEX2_SIZE_MASK;
++         /// `FUTEX2_NUMA`
++-        const NUMA = linux_raw_sys::general::FUTEX2_NUMA;
++-
+++        const NUMA = FUTEX2_NUMA;
++         /// `FUTEX2_PRIVATE`
++-        const PRIVATE = linux_raw_sys::general::FUTEX2_PRIVATE;
++-
+++        const PRIVATE = FUTEX2_PRIVATE;
++         /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
++         const _ = !0;
++     }
++@@ -85,7 +92,7 @@ pub(crate) enum Operation {
++ }
++ 
++ /// `FUTEX_WAITERS`
++-pub const WAITERS: u32 = linux_raw_sys::general::FUTEX_WAITERS;
+++pub const WAITERS: u32 = c::FUTEX_WAITERS;
++ 
++ /// `FUTEX_OWNER_DIED`
++-pub const OWNER_DIED: u32 = linux_raw_sys::general::FUTEX_OWNER_DIED;
+++pub const OWNER_DIED: u32 = c::FUTEX_OWNER_DIED;
++diff --git a/src/backend/libc/thread/syscalls.rs b/src/backend/libc/thread/syscalls.rs
++index 84356fee..5ea541fe 100644
++--- a/src/backend/libc/thread/syscalls.rs
+++++ b/src/backend/libc/thread/syscalls.rs
++@@ -341,13 +341,13 @@ pub(crate) fn setns(fd: BorrowedFd<'_>, nstype: c::c_int) -> io::Result<c::c_int
++     unsafe { ret_c_int(setns(borrowed_fd(fd), nstype)) }
++ }
++ 
++-#[cfg(linux_kernel)]
+++#[cfg(all(linux_kernel, linux_raw_dep))]
++ #[inline]
++ pub(crate) unsafe fn unshare(flags: crate::thread::UnshareFlags) -> io::Result<()> {
++     ret(c::unshare(flags.bits() as i32))
++ }
++ 
++-#[cfg(linux_kernel)]
+++#[cfg(all(linux_kernel, linux_raw_dep))]
++ #[inline]
++ pub(crate) fn capget(
++     header: &mut linux_raw_sys::general::__user_cap_header_struct,
++@@ -369,7 +369,7 @@ pub(crate) fn capget(
++     }
++ }
++ 
++-#[cfg(linux_kernel)]
+++#[cfg(all(linux_kernel, linux_raw_dep))]
++ #[inline]
++ pub(crate) fn capset(
++     header: &mut linux_raw_sys::general::__user_cap_header_struct,
++@@ -477,6 +477,7 @@ pub(crate) unsafe fn futex_val2(
++     let timeout = val2 as usize as *const Timespec;
++ 
++     #[cfg(all(
+++        linux_raw_dep,
++         target_pointer_width = "32",
++         not(any(target_arch = "aarch64", target_arch = "x86_64"))
++     ))]
++@@ -506,6 +507,16 @@ pub(crate) unsafe fn futex_val2(
++         ))
++     }
++ 
+++    #[cfg(all(
+++        not(linux_raw_dep),
+++        target_pointer_width = "32",
+++        not(any(target_arch = "aarch64", target_arch = "x86_64"))
+++    ))]
+++    {
+++        let _ = (uaddr, op, flags, val, timeout, uaddr2, val3);
+++        Err(io::Errno::NOSYS)
+++    }
+++
++     #[cfg(any(
++         target_pointer_width = "64",
++         target_arch = "aarch64",
++@@ -548,6 +559,7 @@ pub(crate) unsafe fn futex_timeout(
++     val3: u32,
++ ) -> io::Result<usize> {
++     #[cfg(all(
+++        linux_raw_dep,
++         target_pointer_width = "32",
++         not(any(target_arch = "aarch64", target_arch = "x86_64"))
++     ))]
++@@ -585,6 +597,16 @@ pub(crate) unsafe fn futex_timeout(
++         })
++     }
++ 
+++    #[cfg(all(
+++        not(linux_raw_dep),
+++        target_pointer_width = "32",
+++        not(any(target_arch = "aarch64", target_arch = "x86_64"))
+++    ))]
+++    {
+++        let _ = (uaddr, op, flags, val, timeout, uaddr2, val3);
+++        Err(io::Errno::NOSYS)
+++    }
+++
++     #[cfg(any(
++         target_pointer_width = "64",
++         target_arch = "aarch64",
++@@ -618,6 +640,7 @@ pub(crate) unsafe fn futex_timeout(
++ /// The raw pointers must point to valid aligned memory.
++ #[cfg(linux_kernel)]
++ #[cfg(all(
+++    linux_raw_dep,
++     target_pointer_width = "32",
++     not(any(target_arch = "aarch64", target_arch = "x86_64"))
++ ))]
++@@ -666,8 +689,9 @@ pub(crate) fn futex_waitv(
++     timeout: Option<&Timespec>,
++     clockid: ClockId,
++ ) -> io::Result<usize> {
+++    use crate::backend::c::clockid_t;
++     use futex::Wait as FutexWait;
++-    use linux_raw_sys::general::__kernel_clockid_t as clockid_t;
+++
++     syscall! {
++         fn futex_waitv(
++             waiters: *const FutexWait,
++diff --git a/src/test_macro.rs b/src/test_macro.rs
++new file mode 100644
++index 00000000..f6a11a8f
++--- /dev/null
+++++ b/src/test_macro.rs
++@@ -0,0 +1,3 @@
+++use crate::ioctl_readwrite;
+++
+++fn main() {}
++diff --git a/src/thread/mod.rs b/src/thread/mod.rs
++index 26d1de42..b5e7e844 100644
++--- a/src/thread/mod.rs
+++++ b/src/thread/mod.rs
++@@ -6,16 +6,16 @@ mod clock;
++ pub mod futex;
++ #[cfg(linux_kernel)]
++ mod id;
++-#[cfg(linux_kernel)]
+++#[cfg(all(linux_kernel, linux_raw_dep))]
++ mod libcap;
++ #[cfg(linux_kernel)]
++ mod membarrier;
++-#[cfg(linux_kernel)]
+++#[cfg(all(linux_kernel, linux_raw_dep))]
++ mod prctl;
++ #[cfg(any(freebsdlike, linux_kernel, target_os = "fuchsia"))]
++ mod sched;
++ mod sched_yield;
++-#[cfg(linux_kernel)]
+++#[cfg(all(linux_kernel, linux_raw_dep))]
++ mod setns;
++ 
++ #[cfg(not(target_os = "redox"))]
++@@ -25,13 +25,14 @@ pub use id::*;
++ #[cfg(linux_kernel)]
++ // #[expect(deprecated, reason = "CapabilityFlags is deprecated")]
++ #[allow(deprecated)]
+++#[cfg(all(linux_kernel, linux_raw_dep))]
++ pub use libcap::{capabilities, set_capabilities, CapabilityFlags, CapabilitySet, CapabilitySets};
++ #[cfg(linux_kernel)]
++ pub use membarrier::*;
++-#[cfg(linux_kernel)]
+++#[cfg(all(linux_kernel, linux_raw_dep))]
++ pub use prctl::*;
++ #[cfg(any(freebsdlike, linux_kernel, target_os = "fuchsia"))]
++ pub use sched::*;
++ pub use sched_yield::sched_yield;
++-#[cfg(linux_kernel)]
+++#[cfg(all(linux_kernel, linux_raw_dep))]
++ pub use setns::*;
++-- 
++2.54.0.545.g6539524ca2-goog
++
+diff --git a/subprojects/packagefiles/windows-link-0.2-rs/meson.build b/subprojects/packagefiles/windows-link-0.2-rs/meson.build
+new file mode 100644
+index 0000000000000000000000000000000000000000..5368eda037d158ea7c2d688b03149ed6402f954f
+--- /dev/null
++++ b/subprojects/packagefiles/windows-link-0.2-rs/meson.build
+@@ -0,0 +1,21 @@
++# Copyright © 2025 Google
++# SPDX-License-Identifier: MIT
++
++project(
++  'windows-link-rs',
++  'rust',
++  version : '0.2.0',
++  license : 'MIT OR Apache-2.0',
++  meson_version : '>= 1.7.0',
++)
++
++lib = static_library(
++  'windows_link',
++  'src/lib.rs',
++  override_options : ['rust_std=2021', 'build.rust_std=2021', 'warning_level=0'],
++  rust_abi: 'rust',
++)
++
++dep_windows_link = declare_dependency(
++  link_with: [lib],
++)
+diff --git a/subprojects/packagefiles/windows-sys-0.6-rs/meson.build b/subprojects/packagefiles/windows-sys-0.6-rs/meson.build
+new file mode 100644
+index 0000000000000000000000000000000000000000..a38c12678500d06766860a89ece0ed5053a0f9e6
+--- /dev/null
++++ b/subprojects/packagefiles/windows-sys-0.6-rs/meson.build
+@@ -0,0 +1,35 @@
++# Copyright © 2025 Google
++# SPDX-License-Identifier: MIT
++
++project(
++  'windows-sys',
++  'rust',
++  version : '0.61.1',
++  license : 'MIT OR Apache-2.0',
++  meson_version : '>= 1.7.0',
++)
++
++windows_link = subproject('windows-link-0.2-rs').get_variable('lib')
++windows_sys_args = [
++  '--cfg', 'feature="Win32"',
++  '--cfg', 'feature="Win32_Networking"',
++  '--cfg', 'feature="Win32_Networking_WinSock"',
++  '--cfg', 'feature="Win32_Foundation"',
++  '--cfg', 'feature="Win32_Foundation_WinSock"',
++  '--cfg', 'feature="Win32_System"',
++  '--cfg', 'feature="Win32_System_Diagnostics"',
++  '--cfg', 'feature="Win32_System_Diagnostics_Debug"',
++]
++
++lib = static_library(
++  'windows_sys',
++  'src/lib.rs',
++  override_options : ['rust_std=2021', 'build.rust_std=2021', 'warning_level=0'],
++  link_with: [windows_link],
++  rust_abi: 'rust',
++  rust_args: windows_sys_args,
++)
++
++dep_windows_sys = declare_dependency(
++  link_with: [lib],
++)
+diff --git a/subprojects/packagefiles/xml-rs/meson.build b/subprojects/packagefiles/xml-rs/meson.build
+new file mode 100644
+index 0000000000000000000000000000000000000000..3864223b98e97baec16b6182eb426071073fa126
+--- /dev/null
++++ b/subprojects/packagefiles/xml-rs/meson.build
+@@ -0,0 +1,25 @@
++project(
++  'xml',
++  'rust',
++  version : '1.2.1',
++  license : 'MIT',
++  meson_version : '>= 1.7.0',
++)
++
++rc = meson.get_compiler('rust')
++
++if rc.version().version_compare('< 1.71')
++  error('Minimum rustc supported version is 1.71')
++endif
++
++lib = static_library(
++  'xml',
++  'src/lib.rs',
++  override_options : ['rust_std=2021', 'build.rust_std=2021', 'warning_level=0'],
++  rust_abi : 'rust',
++  native : true,
++)
++
++dep_xml_rs = declare_dependency(
++  link_with : [lib],
++)
+diff --git a/subprojects/paste-1-rs.wrap b/subprojects/paste-1-rs.wrap
+index fb8e48d94fcacc27b6ff2ce96d6b486871fdf0af..523294aa28d72851ffee20d56295379bd287928f 100644
+--- a/subprojects/paste-1-rs.wrap
++++ b/subprojects/paste-1-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = paste-1.0.14
+-source_url = https://static.crates.io/crates/paste/1.0.14/download
+ source_filename = paste-1.0.14.tar.gz
+ source_hash = de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c
+ patch_directory = paste-1-rs
++
+diff --git a/subprojects/perfetto-sdk.wrap b/subprojects/perfetto-sdk.wrap
+index fb4cf18c0b1079fd010b60ffb86b8a7e6ec983d5..52c70c120fca083500d43240956b8d96083becdc 100644
+--- a/subprojects/perfetto-sdk.wrap
++++ b/subprojects/perfetto-sdk.wrap
+@@ -1,8 +1,7 @@
+ [wrap-file]
+ directory = perfetto-sdk
+ lead_directory_missing = true
+-
+-source_url = https://github.com/google/perfetto/releases/download/v56.1/perfetto-cpp-sdk-src.zip
+ source_filename = perfetto-cpp-sdk-src-v56.1.zip
+ source_hash = 9138dad1ab39048a61d3333e0c2ebf32a7497ed45e3b7daa5f3a02c14748af38
+ patch_directory = perfetto-sdk
++
+diff --git a/subprojects/pest-2-rs.wrap b/subprojects/pest-2-rs.wrap
+index 4c38e542bc2920eaa713a980139b5c52fcbb6b1a..40dc6969a02fff3f6ea4babeb30d33a6ea0e3aab 100644
+--- a/subprojects/pest-2-rs.wrap
++++ b/subprojects/pest-2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = pest-2.8.0
+-source_url = https://static.crates.io/crates/pest/2.8.0/download
+ source_filename = pest-2.8.0.tar.gz
+ source_hash = 198db74531d58c70a361c42201efde7e2591e976d518caf7662a47dc5720e7b6
+ patch_directory = pest-2-rs
++
+diff --git a/subprojects/pest_derive-2-rs.wrap b/subprojects/pest_derive-2-rs.wrap
+index 254f5867fc8edebc560df431206f2543990059f3..8e92f44dec378a3c89e10439ca58d60d3f288c84 100644
+--- a/subprojects/pest_derive-2-rs.wrap
++++ b/subprojects/pest_derive-2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = pest_derive-2.8.0
+-source_url = https://static.crates.io/crates/pest_derive/2.8.0/download
+ source_filename = pest_derive-2.8.0.tar.gz
+ source_hash = d725d9cfd79e87dccc9341a2ef39d1b6f6353d68c4b33c177febbe1a402c97c5
+ patch_directory = pest_derive-2-rs
++
+diff --git a/subprojects/pest_generator-2-rs.wrap b/subprojects/pest_generator-2-rs.wrap
+index aa43f5e600d6eec9a7b073556e88c526645008d1..1d43f05b52a8815f51924757134e177bbac3f22d 100644
+--- a/subprojects/pest_generator-2-rs.wrap
++++ b/subprojects/pest_generator-2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = pest_generator-2.8.0
+-source_url = https://static.crates.io/crates/pest_generator/2.8.0/download
+ source_filename = pest_generator-2.8.0.tar.gz
+ source_hash = db7d01726be8ab66ab32f9df467ae8b1148906685bbe75c82d1e65d7f5b3f841
+ patch_directory = pest_generator-2-rs
++
+diff --git a/subprojects/pest_meta-2-rs.wrap b/subprojects/pest_meta-2-rs.wrap
+index e0ff92d26d36fab352a8dc0acf3af9941b65d83e..42e7fd13afa8949199f59123c5ea26fa9de21227 100644
+--- a/subprojects/pest_meta-2-rs.wrap
++++ b/subprojects/pest_meta-2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = pest_meta-2.8.0
+-source_url = https://static.crates.io/crates/pest_meta/2.8.0/download
+ source_filename = pest_meta-2.8.0.tar.gz
+ source_hash = 7f9f832470494906d1fca5329f8ab5791cc60beb230c74815dff541cbd2b5ca0
+ patch_directory = pest_meta-2-rs
++
+diff --git a/subprojects/proc-macro2-1-rs.wrap b/subprojects/proc-macro2-1-rs.wrap
+index fdc3fe070251f184e79245de8007a2b6636efc4f..53475e851cd1fc83d53a278134897978da955840 100644
+--- a/subprojects/proc-macro2-1-rs.wrap
++++ b/subprojects/proc-macro2-1-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = proc-macro2-1.0.86
+-source_url = https://static.crates.io/crates/proc-macro2/1.0.86/download
+ source_filename = proc-macro2-1.0.86.tar.gz
+ source_hash = 5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77
+ patch_directory = proc-macro2-1-rs
++
+diff --git a/subprojects/quote-1-rs.wrap b/subprojects/quote-1-rs.wrap
+index ae9c7bef378ac3e32a920011108e1e54c31e3c6b..15551301bb56b2c3236a4341c8685bb755104110 100644
+--- a/subprojects/quote-1-rs.wrap
++++ b/subprojects/quote-1-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = quote-1.0.35
+-source_url = https://static.crates.io/crates/quote/1.0.35/download
+ source_filename = quote-1.0.35.tar.gz
+ source_hash = 291ec9ab5efd934aaf503a6466c5d5251535d108ee747472c3977cc5acc868ef
+ patch_directory = quote-1-rs
++
+diff --git a/subprojects/remain-0.2-rs.wrap b/subprojects/remain-0.2-rs.wrap
+index 0c90398266a56dd59d451cb03908c6c82d1e876b..86e9e8b1692f1f2ff95914bdee3a15287b6b0318 100644
+--- a/subprojects/remain-0.2-rs.wrap
++++ b/subprojects/remain-0.2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = remain-0.2.12
+-source_url = https://static.crates.io/crates/remain/0.2.12/download
+ source_filename = remain-0.2.12.tar.gz
+ source_hash = 1ad5e011230cad274d0532460c5ab69828ea47ae75681b42a841663efffaf794
+ patch_directory = remain-0.2-rs
++
+diff --git a/subprojects/roxmltree-0.20-rs.wrap b/subprojects/roxmltree-0.20-rs.wrap
+index e585e79f4c499e17ca072f9cd63138c7db3e5fcb..fff82a6b9ae76e342ea75f61025d53f349193afa 100644
+--- a/subprojects/roxmltree-0.20-rs.wrap
++++ b/subprojects/roxmltree-0.20-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = roxmltree-0.20.0
+-source_url = https://static.crates.io/crates/roxmltree/0.20.0/download
+ source_filename = roxmltree-0.20.0.tar.gz
+ source_hash = 6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97
+ patch_directory = roxmltree-0.20-rs
++
+diff --git a/subprojects/rustc-hash-2-rs.wrap b/subprojects/rustc-hash-2-rs.wrap
+index c19a1757e99c4335ce56a84f67694d03b50cd9c0..1add04144d193801fd7b506310698d009ecee197 100644
+--- a/subprojects/rustc-hash-2-rs.wrap
++++ b/subprojects/rustc-hash-2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = rustc-hash-2.1.1
+-source_url = https://static.crates.io/crates/rustc-hash/2.1.1/download
+ source_filename = rustc-hash-2.1.1.tar.gz
+ source_hash = 357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d
+ patch_directory = rustc-hash-2-rs
++
+diff --git a/subprojects/rustix-1-rs.wrap b/subprojects/rustix-1-rs.wrap
+index 6a13a088bebdcdaa39f41c8c130c1ca032207433..78d4683bfb535791956397f1d76953a8dcbbf2bd 100644
+--- a/subprojects/rustix-1-rs.wrap
++++ b/subprojects/rustix-1-rs.wrap
+@@ -1,7 +1,7 @@
+ [wrap-file]
+ directory = rustix-1.1.4
+-source_url = https://static.crates.io/crates/rustix/1.1.4/download
+ source_filename = rustix-1.1.4.tar.gz
+ source_hash = b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190
+ patch_directory = rustix-1-rs
+ diff_files = rustix-1-rs/0001-rustix-add-ioctl-wrappers.patch, rustix-1-rs/0002-rustix-improve-for-musl-build-without-linux-raw-sys.patch, rustix-1-rs/0003-rustix-enable-rustix-thread-futex-without-linux-raw-.patch
++
+diff --git a/subprojects/syn-2-rs.wrap b/subprojects/syn-2-rs.wrap
+index ab6b451a553e926a741e4861a1a8b47a0214aab7..1e86a07bd028dfb32adfc19a9bcd72e283cf022f 100644
+--- a/subprojects/syn-2-rs.wrap
++++ b/subprojects/syn-2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = syn-2.0.87
+-source_url = https://static.crates.io/crates/syn/2.0.87/download
+ source_filename = syn-2.0.87.tar.gz
+ source_hash = 25aa4ce346d03a6dcd68dd8b4010bcb74e54e62c90c573f394c46eae99aba32d
+ patch_directory = syn-2-rs
++
+diff --git a/subprojects/thiserror-2-rs.wrap b/subprojects/thiserror-2-rs.wrap
+index b1d7c0cde7b7fe0d35f3205d0c87f0fae80d360a..acb9b651beffff5baeec9d15f49fdb7413c79b5c 100644
+--- a/subprojects/thiserror-2-rs.wrap
++++ b/subprojects/thiserror-2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = thiserror-2.0.11
+-source_url = https://static.crates.io/crates/thiserror/2.0.11/download
+ source_filename = thiserror-2.0.11.tar.gz
+ source_hash = d452f284b73e6d76dd36758a0c8684b1d5be31f92b89d07fd5822175732206fc
+ patch_directory = thiserror-2-rs
++
+diff --git a/subprojects/thiserror-impl-2-rs.wrap b/subprojects/thiserror-impl-2-rs.wrap
+index ddd511133ced49c33ac16772f35ac2be76b545af..08adee9a3bf695b9f8da58c51ea7a6f3010b1f85 100644
+--- a/subprojects/thiserror-impl-2-rs.wrap
++++ b/subprojects/thiserror-impl-2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = thiserror-impl-2.0.11
+-source_url = https://static.crates.io/crates/thiserror-impl/2.0.11/download
+ source_filename = thiserror-impl-2.0.11.tar.gz
+ source_hash = 26afc1baea8a989337eeb52b6e72a039780ce45c3edfcc9c5b9d112feeb173c2
+ patch_directory = thiserror-impl-2-rs
++
+diff --git a/subprojects/ucd-trie-0.1-rs.wrap b/subprojects/ucd-trie-0.1-rs.wrap
+index 6219120f3905bc158efcb696cb2f6b638cc9e47f..775cb1dbb23ab0acf565e94935e7be2755a87442 100644
+--- a/subprojects/ucd-trie-0.1-rs.wrap
++++ b/subprojects/ucd-trie-0.1-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = ucd-trie-0.1.6
+-source_url = https://static.crates.io/crates/ucd-trie/0.1.6/download
+ source_filename = ucd-trie-0.1.6.tar.gz
+ source_hash = ed646292ffc8188ef8ea4d1e0e0150fb15a5c2e12ad9b8fc191ae7a8a7f3c4b9
+ patch_directory = ucd-trie-0.1-rs
++
+diff --git a/subprojects/unicode-ident-1-rs.wrap b/subprojects/unicode-ident-1-rs.wrap
+index 439c42c9a4c14e62bee150b6b33ab881017b7028..6c725efbdd84bcd89893f5cbcc1ae77d5a22d58f 100644
+--- a/subprojects/unicode-ident-1-rs.wrap
++++ b/subprojects/unicode-ident-1-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = unicode-ident-1.0.12
+-source_url = https://static.crates.io/crates/unicode-ident/1.0.12/download
+ source_filename = unicode-ident-1.0.12.tar.gz
+ source_hash = 3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b
+ patch_directory = unicode-ident-1-rs
++
+diff --git a/subprojects/wayland-protocols.wrap b/subprojects/wayland-protocols.wrap
+index c6686b4ae4a86c8a6450650ef2699a445257f31c..ec845b1e254b4491d39daaa207e6e290d6342e36 100644
+--- a/subprojects/wayland-protocols.wrap
++++ b/subprojects/wayland-protocols.wrap
+@@ -1,8 +1,8 @@
+ [wrap-file]
+ directory = wayland-protocols-1.41
+-source_url = https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/1.41/downloads/wayland-protocols-1.41.tar.xz
+ source_filename = wayland-protocols-1.41.tar.xz
+ source_hash = 2786b6b1b79965e313f2c289c12075b9ed700d41844810c51afda10ee329576b
+ 
+ [provide]
+ wayland-protocols = wayland_protocols
++
+diff --git a/subprojects/windows-link-0.2-rs.wrap b/subprojects/windows-link-0.2-rs.wrap
+index 42ca1d789aea8890bfa60c79c78a86cbe977fbb3..206bac69c8e7edf8f47ca51058d655848a21dc50 100644
+--- a/subprojects/windows-link-0.2-rs.wrap
++++ b/subprojects/windows-link-0.2-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = windows-link-0.2.0
+-source_url = https://static.crates.io/crates/windows-link/0.2.0/download
+ source_filename = windows-link-0.2.0.tar.gz
+ source_hash = 45e46c0661abb7180e7b9c281db115305d49ca1709ab8242adf09666d2173c65
+ patch_directory = windows-link-0.2-rs
++
+diff --git a/subprojects/windows-sys-0.6-rs.wrap b/subprojects/windows-sys-0.6-rs.wrap
+index f7bd938bf585bb401a4e9f069391d961e131c7c7..e4784d73896a1870087c5656d9d84eb99d8db5a1 100644
+--- a/subprojects/windows-sys-0.6-rs.wrap
++++ b/subprojects/windows-sys-0.6-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = windows-sys-0.61.1
+-source_url = https://static.crates.io/crates/windows-sys/0.61.1/download
+ source_filename = windows-sys-0.61.1.tar.gz
+ source_hash = 6f109e41dd4a3c848907eb83d5a42ea98b3769495597450cf6d153507b166f0f
+ patch_directory = windows-sys-0.6-rs
++
+diff --git a/subprojects/xml-rs.wrap b/subprojects/xml-rs.wrap
+index a60a011b478e3ffe551e828c41674012bd467ceb..542bf98a690ba1d368d880c9a8a520170a0ba1b0 100644
+--- a/subprojects/xml-rs.wrap
++++ b/subprojects/xml-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = xml-1.2.1
+-source_url = https://static.crates.io/crates/xml/1.2.1/download
+ source_filename = xml-1.2.1.tar.gz
+ source_hash = b8aa498d22c9bbaf482329839bc5620c46be275a19a812e9a22a2b07529a642a
+ patch_directory = xml-rs
++
+diff --git a/subprojects/zerocopy-0.8-rs.wrap b/subprojects/zerocopy-0.8-rs.wrap
+index 7945c5072e227d36b66313900d4b2f86e700c3f9..f3473cb79f19ceea250fdc16f60c8f82bf838854 100644
+--- a/subprojects/zerocopy-0.8-rs.wrap
++++ b/subprojects/zerocopy-0.8-rs.wrap
+@@ -1,8 +1,7 @@
+ [wrap-file]
+ directory = zerocopy-0.8.13
+-source_url = https://static.crates.io/crates/zerocopy/0.8.13/download
+ source_filename = zerocopy-0.8.13.tar.gz
+ source_hash = 67914ab451f3bfd2e69e5e9d2ef3858484e7074d63f204fd166ec391b54de21d
+ patch_directory = zerocopy-0.8-rs
+-
+ diff_files = zerocopy-0.8-rs/0001-zerocopy-work-around-Meson-limitation.patch
++
+diff --git a/subprojects/zerocopy-derive-0.8-rs.wrap b/subprojects/zerocopy-derive-0.8-rs.wrap
+index b16f4bd04c852dc4dcc473b26ea1135492f82e7c..c6f7d5afb6f6a0bcd65a2ffe5b13de1df6a6716d 100644
+--- a/subprojects/zerocopy-derive-0.8-rs.wrap
++++ b/subprojects/zerocopy-derive-0.8-rs.wrap
+@@ -1,6 +1,6 @@
+ [wrap-file]
+ directory = zerocopy-derive-0.8.13
+-source_url = https://static.crates.io/crates/zerocopy-derive/0.8.13/download
+ source_filename = zerocopy-derive-0.8.13.tar.gz
+ source_hash = 7988d73a4303ca289df03316bc490e934accf371af6bc745393cf3c2c5c4f25d
+ patch_directory = zerocopy-derive-0.8-rs
++
+diff --git a/subprojects/zlib.wrap b/subprojects/zlib.wrap
+index aa14de17740728cecdb7431fb101e55e9b022273..015a663d61693538f3841ebe2ad87f0e7e91b896 100644
+--- a/subprojects/zlib.wrap
++++ b/subprojects/zlib.wrap
+@@ -1,7 +1,5 @@
+ [wrap-file]
+ directory = zlib-1.3.1
+-source_url = http://zlib.net/fossils/zlib-1.3.1.tar.gz
+-source_fallback_url = https://github.com/mesonbuild/wrapdb/releases/download/zlib_1.3.1-1/zlib-1.3.1.tar.gz
+ source_filename = zlib-1.3.1.tar.gz
+ source_hash = 9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
+ patch_filename = zlib_1.3.1-1_patch.zip
+@@ -11,3 +9,4 @@ wrapdb_version = 1.3.1-1
+ 
+ [provide]
+ zlib = zlib_dep
++

@@ -1,0 +1,55 @@
+From b76f99bbed601a0d73621a7e30c214eca1c87590 Mon Sep 17 00:00:00 2001
+From: cool <bilibili@att.net>
+Date: Wed, 28 Oct 2026 15:01:30 +0800
+Subject: [PATCH] java: tune compiler JVMs for the Spark image build
+
+Use SerialGC, larger code caches and limited tiered compilation for javac, dex and Kotlin tools.
+
+Change-Id: Ibb09411d5d968b7adbc91d5060a71d8c5c54f8a7
+
+diff --git a/java/config/config.go b/java/config/config.go
+index d771905150f3c23ba79a0e00f89e406336520144..0006dec29a7f4518feb1d2c6a3b5ff9823a44cd4 100644
+--- a/java/config/config.go
++++ b/java/config/config.go
+@@ -59,19 +59,24 @@ var (
+ 	javaVmFlagsList = []string{
+ 		`-XX:OnError="cat hs_err_pid%p.log"`,
+ 		"-XX:CICompilerCount=6",
+-		"-XX:+UseDynamicNumberOfGCThreads",
++		"-XX:+UseSerialGC",
++		"-XX:ReservedCodeCacheSize=512m",
+ 	}
+ 	javacVmFlagsList = []string{
+ 		`-J-XX:OnError="cat hs_err_pid%p.log"`,
+ 		"-J-XX:CICompilerCount=6",
+-		"-J-XX:+UseDynamicNumberOfGCThreads",
++		"-J-XX:+UseSerialGC",
++		"-J-XX:ReservedCodeCacheSize=512m",
+ 		"-J-XX:+TieredCompilation",
+ 		"-J-XX:TieredStopAtLevel=1",
+ 	}
+ 	dexerJavaVmFlagsList = []string{
+ 		`-JXX:OnError="cat hs_err_pid%p.log"`,
+ 		"-JXX:CICompilerCount=6",
+-		"-JXX:+UseDynamicNumberOfGCThreads",
++		"-JXX:+UseSerialGC",
++		"-JXX:ReservedCodeCacheSize=512m",
++		"-JXX:+TieredCompilation",
++		"-JXX:TieredStopAtLevel=1",
+ 	}
+ )
+ 
+diff --git a/java/config/kotlin.go b/java/config/kotlin.go
+index c1696a433d3b8a48e07f4bbcc72ca252da49b821..ef743ca5312328e5e6daf9bf00e1248a80b82647 100644
+--- a/java/config/kotlin.go
++++ b/java/config/kotlin.go
+@@ -73,7 +73,8 @@ func init() {
+ 		return strings.Join(suppressWarningsFlags, " ")
+ 	})
+ 
+-	pctx.StaticVariable("KotlincGlobalFlags", strings.Join([]string{}, " "))
++	pctx.StaticVariable("KotlincGlobalFlags",
++		"-J-XX:+UseSerialGC -J-XX:TieredStopAtLevel=1 -J-XX:ReservedCodeCacheSize=1g")
+ 	// Use KotlincKytheGlobalFlags to prevent kotlinc version skew issues between android and
+ 	// g3 kythe indexers.
+ 	// This is necessary because there might be instances of kotlin code in android

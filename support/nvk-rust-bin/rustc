@@ -1,0 +1,41 @@
+#!/bin/sh
+# Wrapper around the AOSP rustc for the Mesa NVK (nouveau Vulkan) build.
+#
+# Two adjustments are needed, both for the Android targets:
+#
+# 1. Meson queries `rustc --version` and feeds the result to bindgen's
+#    --rust-target option. The AOSP rustc reports "1.93.1-dev" and bindgen
+#    rejects that value, so strip the "-dev" suffix for version queries.
+#
+# 2. The prebuilt AOSP std for *-linux-android is compiled with
+#    panic=abort, while rustc's default panic strategy is unwind. Mesa does
+#    not pass an explicit strategy, which makes rustc fail with
+#    "the crate `panic_unwind` does not have the panic strategy `unwind`".
+#    Force abort for the Android targets (host/proc-macro builds, which do
+#    use the unwind std, are left alone).
+REAL=$(ls -d /home/cool/lineage24/prebuilts/rust-toolchain/linux-x86/*/bin/rustc | sort -V | tail -1)
+
+android_target=
+have_panic=
+for arg in "$@"; do
+    case "$arg" in
+        --version|-vV|--verbose-version)
+            "$REAL" "$@" | sed 's/1\.93\.1-dev/1.93.1/'
+            exit 0
+            ;;
+        aarch64-linux-android*|armv7-linux-android*|x86_64-linux-android*)
+            android_target=1
+            ;;
+    esac
+    case "$arg" in
+        *panic=*)
+            have_panic=1
+            ;;
+    esac
+done
+
+if [ -n "$android_target" ] && [ -z "$have_panic" ]; then
+    exec "$REAL" "$@" -C panic=abort
+fi
+
+exec "$REAL" "$@"

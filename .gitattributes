@@ -1,0 +1,3 @@
+# Mail patches preserve context whitespace from upstream source files.
+*.patch -whitespace
+*.patch.xz binary

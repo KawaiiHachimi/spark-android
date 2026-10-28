@@ -1,0 +1,408 @@
+[
+  {
+    "wrap": "Vulkan-Profiles.wrap",
+    "filename": "Vulkan-Profiles-a1e185fb50.zip",
+    "sha256": "775b0faebd53e3f31f1771d7ca9f8d899778ce596177fb9edd8d26d5323f854a",
+    "urls": [
+      "https://github.com/KhronosGroup/Vulkan-Profiles/archive/a1e185fb5035f9726d16a869a2f11067dd21aa10.zip"
+    ],
+    "captured": true,
+    "captured_sha256": "775b0faebd53e3f31f1771d7ca9f8d899778ce596177fb9edd8d26d5323f854a"
+  },
+  {
+    "wrap": "bitflags-2-rs.wrap",
+    "filename": "bitflags-2.9.1.tar.gz",
+    "sha256": "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967",
+    "urls": [
+      "https://static.crates.io/crates/bitflags/2.9.1/download"
+    ],
+    "captured": true,
+    "captured_sha256": "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
+  },
+  {
+    "wrap": "cfg-if-1-rs.wrap",
+    "filename": "cfg-if-1.0.0.tar.gz",
+    "sha256": "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd",
+    "urls": [
+      "https://static.crates.io/crates/cfg-if/1.0.0/download"
+    ],
+    "captured": true,
+    "captured_sha256": "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+  },
+  {
+    "wrap": "equivalent-1-rs.wrap",
+    "filename": "equivalent-1.0.1.tar.gz",
+    "sha256": "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5",
+    "urls": [
+      "https://static.crates.io/crates/equivalent/1.0.1/download"
+    ],
+    "captured": true,
+    "captured_sha256": "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
+  },
+  {
+    "wrap": "errno-0.3-rs.wrap",
+    "filename": "errno-0.3.12.tar.gz",
+    "sha256": "cea14ef9355e3beab063703aa9dab15afd25f0667c341310c1e5274bb1d0da18",
+    "urls": [
+      "https://static.crates.io/crates/errno/0.3.12/download"
+    ],
+    "captured": true,
+    "captured_sha256": "cea14ef9355e3beab063703aa9dab15afd25f0667c341310c1e5274bb1d0da18"
+  },
+  {
+    "wrap": "expat.wrap",
+    "filename": "expat-2.5.0.tar.bz2",
+    "sha256": "ef2420f0232c087801abf705e89ae65f6257df6b7931d37846a193ef2e8cdcbe",
+    "urls": [
+      "https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.xz",
+      "https://github.com/mesonbuild/wrapdb/releases/download/expat_2.5.0-3/expat-2.5.0.tar.bz2"
+    ],
+    "captured": true,
+    "captured_sha256": "ef2420f0232c087801abf705e89ae65f6257df6b7931d37846a193ef2e8cdcbe"
+  },
+  {
+    "wrap": "hashbrown-0.14-rs.wrap",
+    "filename": "hashbrown-0.14.1.tar.gz",
+    "sha256": "7dfda62a12f55daeae5015f81b0baea145391cb4520f86c248fc615d72640d12",
+    "urls": [
+      "https://static.crates.io/crates/hashbrown/0.14.1/download"
+    ],
+    "captured": true,
+    "captured_sha256": "7dfda62a12f55daeae5015f81b0baea145391cb4520f86c248fc615d72640d12"
+  },
+  {
+    "wrap": "indexmap-2-rs.wrap",
+    "filename": "indexmap-2.2.6.tar.gz",
+    "sha256": "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26",
+    "urls": [
+      "https://static.crates.io/crates/indexmap/2.2.6/download"
+    ],
+    "captured": true,
+    "captured_sha256": "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26"
+  },
+  {
+    "wrap": "libarchive.wrap",
+    "filename": "libarchive-3.7.2.tar.xz",
+    "sha256": "04357661e6717b6941682cde02ad741ae4819c67a260593dfb2431861b251acb",
+    "urls": [
+      "https://github.com/libarchive/libarchive/releases/download/v3.7.2/libarchive-3.7.2.tar.xz",
+      "https://github.com/mesonbuild/wrapdb/releases/download/libarchive_3.7.2-3/libarchive-3.7.2.tar.xz"
+    ],
+    "captured": true,
+    "captured_sha256": "04357661e6717b6941682cde02ad741ae4819c67a260593dfb2431861b251acb"
+  },
+  {
+    "wrap": "libc-0.2-rs.wrap",
+    "filename": "libc-0.2.185.tar.gz",
+    "sha256": "52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f",
+    "urls": [
+      "https://static.crates.io/crates/libc/0.2.185/download"
+    ],
+    "captured": true,
+    "captured_sha256": "52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f"
+  },
+  {
+    "wrap": "libdrm.wrap",
+    "filename": "libdrm-2.4.133.tar.xz",
+    "sha256": "fc68f9d0ba2ea63c9432a299e14fea09fad7a8a66e8039fcd7802ca59f77b4f5",
+    "urls": [
+      "https://dri.freedesktop.org/libdrm/libdrm-2.4.133.tar.xz",
+      "https://wrapdb.mesonbuild.com/v2/libdrm_2.4.133-1/get_source/libdrm-2.4.133.tar.xz"
+    ],
+    "captured": true,
+    "captured_sha256": "fc68f9d0ba2ea63c9432a299e14fea09fad7a8a66e8039fcd7802ca59f77b4f5"
+  },
+  {
+    "wrap": "libva.wrap",
+    "filename": "2.22.0.tar.gz",
+    "sha256": "467c418c2640a178c6baad5be2e00d569842123763b80507721ab87eb7af8735",
+    "urls": [
+      "https://github.com/intel/libva/archive/refs/tags/2.22.0.tar.gz"
+    ],
+    "captured": true,
+    "captured_sha256": "467c418c2640a178c6baad5be2e00d569842123763b80507721ab87eb7af8735"
+  },
+  {
+    "wrap": "libxml2.wrap",
+    "filename": "libxml2-2.11.6.tar.xz",
+    "sha256": "c90eee7506764abbe07bb616b82da452529609815aefef423d66ef080eb0c300",
+    "urls": [
+      "https://download.gnome.org/sources/libxml2/2.11/libxml2-2.11.6.tar.xz",
+      "https://github.com/mesonbuild/wrapdb/releases/download/libxml2_2.11.6-1/libxml2-2.11.6.tar.xz"
+    ],
+    "captured": true,
+    "captured_sha256": "c90eee7506764abbe07bb616b82da452529609815aefef423d66ef080eb0c300"
+  },
+  {
+    "wrap": "log-0.4-rs.wrap",
+    "filename": "log-0.4.27.tar.gz",
+    "sha256": "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94",
+    "urls": [
+      "https://static.crates.io/crates/log/0.4.27/download"
+    ],
+    "captured": true,
+    "captured_sha256": "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
+  },
+  {
+    "wrap": "lua.wrap",
+    "filename": "lua-5.4.6.tar.gz",
+    "sha256": "7d5ea1b9cb6aa0b59ca3dde1c6adcb57ef83a1ba8e5432c0ecd06bf439b3ad88",
+    "urls": [
+      "https://www.lua.org/ftp/lua-5.4.6.tar.gz",
+      "https://github.com/mesonbuild/wrapdb/releases/download/lua_5.4.6-4/lua-5.4.6.tar.gz"
+    ],
+    "captured": true,
+    "captured_sha256": "7d5ea1b9cb6aa0b59ca3dde1c6adcb57ef83a1ba8e5432c0ecd06bf439b3ad88"
+  },
+  {
+    "wrap": "once_cell-1-rs.wrap",
+    "filename": "once_cell-1.8.0.tar.gz",
+    "sha256": "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56",
+    "urls": [
+      "https://static.crates.io/crates/once_cell/1.8.0/download"
+    ],
+    "captured": true,
+    "captured_sha256": "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
+  },
+  {
+    "wrap": "paste-1-rs.wrap",
+    "filename": "paste-1.0.14.tar.gz",
+    "sha256": "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c",
+    "urls": [
+      "https://static.crates.io/crates/paste/1.0.14/download"
+    ],
+    "captured": true,
+    "captured_sha256": "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
+  },
+  {
+    "wrap": "perfetto-sdk.wrap",
+    "filename": "perfetto-cpp-sdk-src-v56.1.zip",
+    "sha256": "9138dad1ab39048a61d3333e0c2ebf32a7497ed45e3b7daa5f3a02c14748af38",
+    "urls": [
+      "https://github.com/google/perfetto/releases/download/v56.1/perfetto-cpp-sdk-src.zip"
+    ],
+    "captured": true,
+    "captured_sha256": "9138dad1ab39048a61d3333e0c2ebf32a7497ed45e3b7daa5f3a02c14748af38"
+  },
+  {
+    "wrap": "pest-2-rs.wrap",
+    "filename": "pest-2.8.0.tar.gz",
+    "sha256": "198db74531d58c70a361c42201efde7e2591e976d518caf7662a47dc5720e7b6",
+    "urls": [
+      "https://static.crates.io/crates/pest/2.8.0/download"
+    ],
+    "captured": true,
+    "captured_sha256": "198db74531d58c70a361c42201efde7e2591e976d518caf7662a47dc5720e7b6"
+  },
+  {
+    "wrap": "pest_derive-2-rs.wrap",
+    "filename": "pest_derive-2.8.0.tar.gz",
+    "sha256": "d725d9cfd79e87dccc9341a2ef39d1b6f6353d68c4b33c177febbe1a402c97c5",
+    "urls": [
+      "https://static.crates.io/crates/pest_derive/2.8.0/download"
+    ],
+    "captured": true,
+    "captured_sha256": "d725d9cfd79e87dccc9341a2ef39d1b6f6353d68c4b33c177febbe1a402c97c5"
+  },
+  {
+    "wrap": "pest_generator-2-rs.wrap",
+    "filename": "pest_generator-2.8.0.tar.gz",
+    "sha256": "db7d01726be8ab66ab32f9df467ae8b1148906685bbe75c82d1e65d7f5b3f841",
+    "urls": [
+      "https://static.crates.io/crates/pest_generator/2.8.0/download"
+    ],
+    "captured": true,
+    "captured_sha256": "db7d01726be8ab66ab32f9df467ae8b1148906685bbe75c82d1e65d7f5b3f841"
+  },
+  {
+    "wrap": "pest_meta-2-rs.wrap",
+    "filename": "pest_meta-2.8.0.tar.gz",
+    "sha256": "7f9f832470494906d1fca5329f8ab5791cc60beb230c74815dff541cbd2b5ca0",
+    "urls": [
+      "https://static.crates.io/crates/pest_meta/2.8.0/download"
+    ],
+    "captured": true,
+    "captured_sha256": "7f9f832470494906d1fca5329f8ab5791cc60beb230c74815dff541cbd2b5ca0"
+  },
+  {
+    "wrap": "proc-macro2-1-rs.wrap",
+    "filename": "proc-macro2-1.0.86.tar.gz",
+    "sha256": "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77",
+    "urls": [
+      "https://static.crates.io/crates/proc-macro2/1.0.86/download"
+    ],
+    "captured": true,
+    "captured_sha256": "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
+  },
+  {
+    "wrap": "quote-1-rs.wrap",
+    "filename": "quote-1.0.35.tar.gz",
+    "sha256": "291ec9ab5efd934aaf503a6466c5d5251535d108ee747472c3977cc5acc868ef",
+    "urls": [
+      "https://static.crates.io/crates/quote/1.0.35/download"
+    ],
+    "captured": true,
+    "captured_sha256": "291ec9ab5efd934aaf503a6466c5d5251535d108ee747472c3977cc5acc868ef"
+  },
+  {
+    "wrap": "remain-0.2-rs.wrap",
+    "filename": "remain-0.2.12.tar.gz",
+    "sha256": "1ad5e011230cad274d0532460c5ab69828ea47ae75681b42a841663efffaf794",
+    "urls": [
+      "https://static.crates.io/crates/remain/0.2.12/download"
+    ],
+    "captured": true,
+    "captured_sha256": "1ad5e011230cad274d0532460c5ab69828ea47ae75681b42a841663efffaf794"
+  },
+  {
+    "wrap": "roxmltree-0.20-rs.wrap",
+    "filename": "roxmltree-0.20.0.tar.gz",
+    "sha256": "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97",
+    "urls": [
+      "https://static.crates.io/crates/roxmltree/0.20.0/download"
+    ],
+    "captured": true,
+    "captured_sha256": "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
+  },
+  {
+    "wrap": "rustc-hash-2-rs.wrap",
+    "filename": "rustc-hash-2.1.1.tar.gz",
+    "sha256": "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d",
+    "urls": [
+      "https://static.crates.io/crates/rustc-hash/2.1.1/download"
+    ],
+    "captured": true,
+    "captured_sha256": "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
+  },
+  {
+    "wrap": "rustix-1-rs.wrap",
+    "filename": "rustix-1.1.4.tar.gz",
+    "sha256": "b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190",
+    "urls": [
+      "https://static.crates.io/crates/rustix/1.1.4/download"
+    ],
+    "captured": true,
+    "captured_sha256": "b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190"
+  },
+  {
+    "wrap": "syn-2-rs.wrap",
+    "filename": "syn-2.0.87.tar.gz",
+    "sha256": "25aa4ce346d03a6dcd68dd8b4010bcb74e54e62c90c573f394c46eae99aba32d",
+    "urls": [
+      "https://static.crates.io/crates/syn/2.0.87/download"
+    ],
+    "captured": true,
+    "captured_sha256": "25aa4ce346d03a6dcd68dd8b4010bcb74e54e62c90c573f394c46eae99aba32d"
+  },
+  {
+    "wrap": "thiserror-2-rs.wrap",
+    "filename": "thiserror-2.0.11.tar.gz",
+    "sha256": "d452f284b73e6d76dd36758a0c8684b1d5be31f92b89d07fd5822175732206fc",
+    "urls": [
+      "https://static.crates.io/crates/thiserror/2.0.11/download"
+    ],
+    "captured": true,
+    "captured_sha256": "d452f284b73e6d76dd36758a0c8684b1d5be31f92b89d07fd5822175732206fc"
+  },
+  {
+    "wrap": "thiserror-impl-2-rs.wrap",
+    "filename": "thiserror-impl-2.0.11.tar.gz",
+    "sha256": "26afc1baea8a989337eeb52b6e72a039780ce45c3edfcc9c5b9d112feeb173c2",
+    "urls": [
+      "https://static.crates.io/crates/thiserror-impl/2.0.11/download"
+    ],
+    "captured": true,
+    "captured_sha256": "26afc1baea8a989337eeb52b6e72a039780ce45c3edfcc9c5b9d112feeb173c2"
+  },
+  {
+    "wrap": "ucd-trie-0.1-rs.wrap",
+    "filename": "ucd-trie-0.1.6.tar.gz",
+    "sha256": "ed646292ffc8188ef8ea4d1e0e0150fb15a5c2e12ad9b8fc191ae7a8a7f3c4b9",
+    "urls": [
+      "https://static.crates.io/crates/ucd-trie/0.1.6/download"
+    ],
+    "captured": true,
+    "captured_sha256": "ed646292ffc8188ef8ea4d1e0e0150fb15a5c2e12ad9b8fc191ae7a8a7f3c4b9"
+  },
+  {
+    "wrap": "unicode-ident-1-rs.wrap",
+    "filename": "unicode-ident-1.0.12.tar.gz",
+    "sha256": "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b",
+    "urls": [
+      "https://static.crates.io/crates/unicode-ident/1.0.12/download"
+    ],
+    "captured": true,
+    "captured_sha256": "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
+  },
+  {
+    "wrap": "wayland-protocols.wrap",
+    "filename": "wayland-protocols-1.41.tar.xz",
+    "sha256": "2786b6b1b79965e313f2c289c12075b9ed700d41844810c51afda10ee329576b",
+    "urls": [
+      "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/1.41/downloads/wayland-protocols-1.41.tar.xz"
+    ],
+    "captured": true,
+    "captured_sha256": "2786b6b1b79965e313f2c289c12075b9ed700d41844810c51afda10ee329576b"
+  },
+  {
+    "wrap": "windows-link-0.2-rs.wrap",
+    "filename": "windows-link-0.2.0.tar.gz",
+    "sha256": "45e46c0661abb7180e7b9c281db115305d49ca1709ab8242adf09666d2173c65",
+    "urls": [
+      "https://static.crates.io/crates/windows-link/0.2.0/download"
+    ],
+    "captured": true,
+    "captured_sha256": "45e46c0661abb7180e7b9c281db115305d49ca1709ab8242adf09666d2173c65"
+  },
+  {
+    "wrap": "windows-sys-0.6-rs.wrap",
+    "filename": "windows-sys-0.61.1.tar.gz",
+    "sha256": "6f109e41dd4a3c848907eb83d5a42ea98b3769495597450cf6d153507b166f0f",
+    "urls": [
+      "https://static.crates.io/crates/windows-sys/0.61.1/download"
+    ],
+    "captured": true,
+    "captured_sha256": "6f109e41dd4a3c848907eb83d5a42ea98b3769495597450cf6d153507b166f0f"
+  },
+  {
+    "wrap": "xml-rs.wrap",
+    "filename": "xml-1.2.1.tar.gz",
+    "sha256": "b8aa498d22c9bbaf482329839bc5620c46be275a19a812e9a22a2b07529a642a",
+    "urls": [
+      "https://static.crates.io/crates/xml/1.2.1/download"
+    ],
+    "captured": true,
+    "captured_sha256": "b8aa498d22c9bbaf482329839bc5620c46be275a19a812e9a22a2b07529a642a"
+  },
+  {
+    "wrap": "zerocopy-0.8-rs.wrap",
+    "filename": "zerocopy-0.8.13.tar.gz",
+    "sha256": "67914ab451f3bfd2e69e5e9d2ef3858484e7074d63f204fd166ec391b54de21d",
+    "urls": [
+      "https://static.crates.io/crates/zerocopy/0.8.13/download"
+    ],
+    "captured": true,
+    "captured_sha256": "67914ab451f3bfd2e69e5e9d2ef3858484e7074d63f204fd166ec391b54de21d"
+  },
+  {
+    "wrap": "zerocopy-derive-0.8-rs.wrap",
+    "filename": "zerocopy-derive-0.8.13.tar.gz",
+    "sha256": "7988d73a4303ca289df03316bc490e934accf371af6bc745393cf3c2c5c4f25d",
+    "urls": [
+      "https://static.crates.io/crates/zerocopy-derive/0.8.13/download"
+    ],
+    "captured": true,
+    "captured_sha256": "7988d73a4303ca289df03316bc490e934accf371af6bc745393cf3c2c5c4f25d"
+  },
+  {
+    "wrap": "zlib.wrap",
+    "filename": "zlib-1.3.1.tar.gz",
+    "sha256": "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23",
+    "urls": [
+      "http://zlib.net/fossils/zlib-1.3.1.tar.gz",
+      "https://github.com/mesonbuild/wrapdb/releases/download/zlib_1.3.1-1/zlib-1.3.1.tar.gz"
+    ],
+    "captured": true,
+    "captured_sha256": "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
+  }
+]

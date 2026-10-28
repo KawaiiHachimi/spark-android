@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <remote name="lineage" fetch="https://github.com/LineageOS/" revision="lineage-24.0" />
+
+  <!-- LineageOS mainline generic device tree and its LineageOS dependencies -->
+  <project name="android_device_mainline_generic" path="device/mainline/generic" remote="lineage" />
+  <project name="android_device_mainline_common" path="device/mainline/common" remote="lineage" />
+  <project name="android_external_drm_hwcomposer-upstream" path="external/drm_hwcomposer-upstream" remote="lineage" />
+  <project name="android_external_minigbm-upstream" path="external/minigbm-upstream" remote="lineage" />
+  <project name="android_external_linux-firmware-mainline" path="external/linux-firmware-mainline" remote="lineage" />
+  <!-- No lineage-24.0 branch exists; lineage-23.2 is the current head. -->
+  <project name="android_external_mesa" path="external/mesa" remote="lineage" revision="lineage-23.2" />
+  <project name="android_hardware_mainline_common" path="hardware/mainline/common" remote="lineage" />
+  <project name="android_vendor_mainline" path="vendor/mainline" remote="lineage" />
+  <project name="android_external_tinyhal" path="external/tinyhal" remote="lineage" />
+  <project name="android_kernel_mainline_configs" path="kernel/mainline/configs" remote="lineage" />
+  <project name="android_prebuilts_bootmgr" path="prebuilts/bootmgr" remote="lineage" />
+
+  <!-- Transitive dependencies of the mainline device tree and external/mesa -->
+  <project name="android_prebuilts_mesa-build-dep" path="prebuilts/mesa-build-dep" remote="lineage" revision="lineage-23.2" />
+  <project name="android_external_alsa-lib" path="external/alsa-lib" remote="lineage" />
+  <project name="android_external_alsa-ucm-conf" path="external/alsa-ucm-conf" remote="lineage" />
+  <project name="android_external_libdisplay-info-upstream" path="external/libdisplay-info-upstream" remote="lineage" />
+</manifest>
